@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ContextHub AI — The Context Layer for AI Agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #080808;
+    --surface: #0f0f0f;
+    --border: #1e1e1e;
+    --border-bright: #2e2e2e;
+    --text: #e8e4dc;
+    --text-dim: #6a6560;
+    --text-mid: #9e9890;
+    --accent: #e8c547;
+    --accent-dim: #a8901f;
+    --red: #e84747;
+    --green: #47e8a0;
+    --blue: #47a8e8;
+    --mono: 'IBM Plex Mono', monospace;
+    --serif: 'DM Serif Display', serif;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    overflow-x: hidden;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.35;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 48px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,8,8,0.85);
+    backdrop-filter: blur(12px);
+  }
+  .nav-logo {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .nav-logo span { color: var(--accent); }
+  .nav-links {
+    display: flex;
+    gap: 36px;
+    list-style: none;
+    align-items: center;
+  }
+  .nav-links a {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--accent);
+    color: #000;
+    padding: 9px 20px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .nav-cta:hover { background: #fff; transform: translateY(-1px); }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+    padding-top: 80px;
+  }
+  .hero-left {
+    padding: 80px 48px 80px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-tag::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
+  .hero-h1 {
+    font-family: var(--serif);
+    font-size: clamp(52px, 5.5vw, 80px);
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    margin-bottom: 32px;
+    color: var(--text);
+  }
+  .hero-h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .hero-sub {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text-mid);
+    max-width: 440px;
+    margin-bottom: 48px;
+  }
+  .hero-sub strong { color: var(--text); font-weight: 500; }
+  .hero-actions {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .btn-primary {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: #000;
+    padding: 14px 28px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary::after {
+    content: '→';
+    transition: transform 0.2s;
+  }
+  .btn-primary:hover { background: #fff; }
+  .btn-primary:hover::after { transform: translateX(4px); }
+  .btn-ghost {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.2s;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border-bright);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
+
+  .hero-stats {
+    margin-top: 64px;
+    display: flex;
+    gap: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 32px;
+  }
+  .stat {
+    flex: 1;
+    padding-right: 24px;
+  }
+  .stat + .stat { padding-left: 24px; border-left: 1px solid var(--border); }
+  .stat-num {
+    font-family: var(--serif);
+    font-size: 36px;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* HERO RIGHT — live terminal */
+  .hero-right {
+    padding: 80px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    background: var(--surface);
+  }
+  .terminal-window {
+    background: #000;
+    border: 1px solid var(--border-bright);
+    position: relative;
+  }
+  .terminal-bar {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-bright);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #0a0a0a;
+  }
+  .t-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .t-dot.red { background: #e84747; }
+  .t-dot.yellow { background: var(--accent); }
+  .t-dot.green { background: var(--green); }
+  .terminal-title {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-left: 8px;
+  }
+  .terminal-body {
+    padding: 24px;
+    font-size: 12px;
+    line-height: 1.8;
+    min-height: 340px;
+  }
+  .t-line { display: flex; gap: 10px; align-items: flex-start; }
+  .t-prompt { color: var(--accent); user-select: none; flex-shrink: 0; }
+  .t-cmd { color: var(--text); }
+  .t-comment { color: var(--text-dim); }
+  .t-output { color: var(--text-mid); margin-left: 18px; }
+  .t-risk-high { color: var(--red); font-weight: 600; }
+  .t-risk-med { color: var(--accent); font-weight: 600; }
+  .t-risk-low { color: var(--green); font-weight: 600; }
+  .t-key { color: var(--blue); }
+  .t-val { color: var(--green); }
+  .t-blank { height: 8px; }
+  .blink { animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .t-cursor { display: inline-block; width: 8px; height: 14px; background: var(--accent); vertical-align: middle; }
+
+  .risk-badge {
+    display: inline-block;
+    margin-top: 20px;
+    background: rgba(232, 71, 71, 0.1);
+    border: 1px solid rgba(232,71,71,0.3);
+    padding: 14px 20px;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .risk-score-num {
+    font-family: var(--serif);
+    font-size: 48px;
+    color: var(--red);
+    line-height: 1;
+    margin-right: 12px;
+  }
+  .risk-badge-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .risk-badge-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+  }
+  .risk-reasons { font-size: 11px; color: var(--text-mid); line-height: 1.7; }
+  .risk-reasons li { list-style: none; padding-left: 14px; position: relative; }
+  .risk-reasons li::before { content: '↳'; position: absolute; left: 0; color: var(--red); }
+
+  /* TYPE-IN ANIMATION */
+  .typewriter { display: inline; overflow: hidden; white-space: nowrap; }
+
+  /* MARQUEE */
+  .marquee-wrap {
+    overflow: hidden;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0;
+    background: var(--surface);
+  }
+  .marquee-track {
+    display: flex;
+    gap: 0;
+    animation: marquee 22s linear infinite;
+    width: max-content;
+  }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .marquee-item {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 0 40px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .marquee-item span { color: var(--accent); }
+
+  /* SECTION GENERIC */
+  section { position: relative; }
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::before { content: '//'; color: var(--text-dim); }
+  .section-h2 {
+    font-family: var(--serif);
+    font-size: clamp(36px, 4vw, 58px);
+    line-height: 1.05;
+    color: var(--text);
+    margin-bottom: 20px;
+  }
+  .section-h2 em { font-style: italic; color: var(--accent); }
+  .section-sub {
+    font-size: 13px;
+    line-height: 1.85;
+    color: var(--text-mid);
+    max-width: 520px;
+  }
+
+  /* WHY NOW */
+  .why-now {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .why-now-left {
+    padding: 80px 48px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .why-now-right {
+    padding: 80px 48px;
+  }
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .tl-item {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 24px;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .tl-item.visible { opacity: 1; transform: none; }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-year {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--text-dim);
+    line-height: 1;
+    padding-top: 3px;
+    transition: color 0.3s;
+  }
+  .tl-item.active .tl-year { color: var(--accent); }
+  .tl-content-title {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+    letter-spacing: 0.05em;
+  }
+  .tl-content-text {
+    font-size: 12px;
+    line-height: 1.75;
+    color: var(--text-mid);
+  }
+  .tl-item.active {
+    background: linear-gradient(90deg, rgba(232,197,71,0.04) 0%, transparent 100%);
+    margin: 0 -48px;
+    padding: 28px 48px;
+  }
+  .tl-inflection {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: rgba(232,197,71,0.15);
+    color: var(--accent);
+    padding: 4px 10px;
+    margin-bottom: 8px;
+  }
+
+  /* FAILURE GRID */
+  .failures {
+    padding: 80px 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .failures-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    margin-bottom: 60px;
+  }
+  .failure-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+  }
+  .failure-card {
+    padding: 32px 28px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s;
+    cursor: default;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.4s ease, transform 0.4s ease, background 0.3s;
+  }
+  .failure-card.visible { opacity: 1; transform: none; }
+  .failure-card:hover { background: var(--surface); }
+  .failure-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+  }
+  .failure-card:hover::before { transform: scaleX(1); }
+  .failure-num {
+    font-family: var(--serif);
+    font-size: 42px;
+    color: var(--border-bright);
+    line-height: 1;
+    margin-bottom: 16px;
+    transition: color 0.3s;
+  }
+  .failure-card:hover .failure-num { color: var(--accent); }
+  .failure-title {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+    letter-spacing: 0.03em;
+  }
+  .failure-text {
+    font-size: 11px;
+    line-height: 1.75;
+    color: var(--text-dim);
+  }
+  .failure-tag {
+    display: inline-block;
+    margin-top: 14px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+  }
+  .tag-critical { background: rgba(232,71,71,0.1); color: var(--red); }
+  .tag-high { background: rgba(232,197,71,0.1); color: var(--accent); }
+  .tag-med { background: rgba(71,168,232,0.1); color: var(--blue); }
+
+  /* HOW IT WORKS */
+  .how {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .how-left {
+    padding: 80px 48px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .how-right {
+    padding: 80px 48px;
+    background: var(--surface);
+  }
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 48px;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 20px;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+    opacity: 0;
+    transform: translateX(-16px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .step.visible { opacity: 1; transform: none; }
+  .step:last-child { border-bottom: none; }
+  .step-num {
+    font-family: var(--serif);
+    font-size: 28px;
+    color: var(--accent);
+    line-height: 1;
+    padding-top: 4px;
+  }
+  .step-title {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+  }
+  .step-text {
+    font-size: 12px;
+    line-height: 1.75;
+    color: var(--text-mid);
+  }
+  .step-code {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--green);
+    background: rgba(71,232,160,0.07);
+    padding: 6px 12px;
+    border-left: 2px solid var(--green);
+  }
+
+  /* MCP INTERFACE */
+  .mcp-panel {
+    background: #000;
+    border: 1px solid var(--border-bright);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+  .mcp-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #050505;
+  }
+  .mcp-title { color: var(--text-dim); font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; }
+  .mcp-status { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--green); }
+  .mcp-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse-green 2s infinite; }
+  @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .mcp-body { padding: 20px; }
+  .mcp-tool {
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .mcp-tool-header {
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+  }
+  .mcp-tool-type { color: var(--text-dim); font-weight: 400; font-size: 10px; }
+  .mcp-tool-body { padding: 12px 16px; font-size: 11px; color: var(--text-mid); line-height: 1.7; }
+  .mcp-param { color: var(--blue); }
+  .mcp-type { color: var(--text-dim); font-style: italic; }
+
+  /* METRICS */
+  .metrics {
+    border-bottom: 1px solid var(--border);
+  }
+  .metrics-top {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-card {
+    padding: 60px 48px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .metric-card:last-child { border-right: none; }
+  .metric-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .metric-card:hover::after { opacity: 1; }
+  .metric-num {
+    font-family: var(--serif);
+    font-size: 72px;
+    line-height: 1;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .metric-num sup { font-size: 32px; color: var(--accent); vertical-align: super; }
+  .metric-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+  .metric-sub { font-size: 12px; color: var(--text-mid); line-height: 1.7; }
+  .metrics-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .metrics-quote {
+    padding: 60px 48px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .quote-text {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-style: italic;
+    line-height: 1.4;
+    color: var(--text);
+    margin-bottom: 24px;
+  }
+  .quote-text em { color: var(--accent); }
+  .quote-attr {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .quote-bar {
+    width: 40px;
+    height: 1px;
+    background: var(--accent);
+    margin-bottom: 10px;
+  }
+  .metrics-cta {
+    padding: 60px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: var(--surface);
+  }
+  .metrics-cta .section-label { margin-bottom: 24px; }
+  .metrics-cta p { font-size: 13px; color: var(--text-mid); line-height: 1.75; margin-bottom: 32px; }
+
+  /* PRICING */
+  .pricing {
+    padding: 80px 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pricing-header { margin-bottom: 60px; }
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--border);
+  }
+  .price-card {
+    padding: 40px 36px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    transition: background 0.3s;
+  }
+  .price-card:last-child { border-right: none; }
+  .price-card.featured {
+    background: linear-gradient(180deg, rgba(232,197,71,0.06) 0%, transparent 100%);
+    border-top: 2px solid var(--accent);
+  }
+  .price-tier {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+  .price-tier.featured-label { color: var(--accent); }
+  .price-amount {
+    font-family: var(--serif);
+    font-size: 52px;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .price-amount span { font-family: var(--mono); font-size: 18px; vertical-align: super; }
+  .price-period { font-size: 11px; color: var(--text-dim); margin-bottom: 32px; }
+  .price-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 36px;
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+  }
+  .price-features li {
+    font-size: 12px;
+    color: var(--text-mid);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .price-features li::before { content: '→'; color: var(--accent); flex-shrink: 0; }
+  .price-cta {
+    display: block;
+    text-align: center;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 1px solid var(--border-bright);
+    color: var(--text-dim);
+    transition: all 0.2s;
+  }
+  .price-cta:hover { border-color: var(--text); color: var(--text); }
+  .price-cta.featured-cta {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+  .price-cta.featured-cta:hover { background: #fff; border-color: #fff; }
+
+  /* FOOTER */
+  footer {
+    padding: 60px 48px;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 48px;
+  }
+  .footer-brand .nav-logo { font-size: 16px; margin-bottom: 16px; display: block; }
+  .footer-brand p { font-size: 11px; color: var(--text-dim); line-height: 1.75; max-width: 220px; }
+  .footer-col h4 {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+  .footer-col ul li a {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-col ul li a:hover { color: var(--text); }
+  .footer-bottom {
+    padding: 20px 48px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-bottom p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.08em; }
+
+  /* SCROLL ANIMATIONS */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .fade-in.visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* GLOW EFFECT */
+  .glow-accent { text-shadow: 0 0 40px rgba(232,197,71,0.4); }
+
+  /* BADGE */
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--green);
+    border: 1px solid rgba(71,232,160,0.25);
+    padding: 6px 12px;
+    margin-bottom: 32px;
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse-green 1.5s infinite; }
+
+  /* HORIZONTAL RULE */
+  .h-rule { height: 1px; background: var(--border); }
+
+  /* ANIMATED COUNTER */
+  .count-up { display: inline; }
+
+  /* GRID DECORATION */
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  /* FLOATING NUMBERS */
+  .float-num {
+    position: absolute;
+    font-family: var(--serif);
+    font-size: 180px;
+    color: rgba(255,255,255,0.02);
+    right: -20px;
+    top: -20px;
+    line-height: 1;
+    user-select: none;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Context<span>Hub</span> AI</div>
+  <ul class="nav-links">
+    <li><a href="#why">Why Now</a></li>
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#mcp">MCP API</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#" class="nav-cta">Request Access</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="grid-bg"></div>
+    <div class="live-badge"><div class="live-dot"></div> Now in Private Beta</div>
+    <div class="hero-tag">Organizational Context Infrastructure</div>
+    <h1 class="hero-h1">
+      The context layer<br/>
+      your AI agents<br/>
+      <em>desperately need</em>
+    </h1>
+    <p class="hero-sub">
+      AI coding agents write production code at 3am and don't know that <strong>auth_legacy drives 40% of revenue</strong>, 
+      the payments module is on PCI lockdown, or that Friday deploys are forbidden.<br/><br/>
+      ContextHub is the mandatory pipe between autonomous agents and enterprise codebases.
+    </p>
+    <div class="hero-actions">
+      <a href="#" class="btn-primary">Install in 10 Minutes</a>
+      <a href="#how" class="btn-ghost">See a live score ↓</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <div class="stat-num">6<span style="color:var(--accent);font-family:var(--mono);font-size:20px">wk</span></div>
+        <div class="stat-label">To build MVP</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">10<span style="color:var(--accent);font-family:var(--mono);font-size:20px">min</span></div>
+        <div class="stat-label">CI/CD integration</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">0</div>
+        <div class="stat-label">Workflow changes</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="terminal-window">
+      <div class="terminal-bar">
+        <div class="t-dot red"></div>
+        <div class="t-dot yellow"></div>
+        <div class="t-dot green"></div>
+        <span class="terminal-title">contexthub — score_change — PR #2847</span>
+      </div>
+      <div class="terminal-body" id="terminal-body">
+        <!-- filled by JS -->
+      </div>
+    </div>
+    <div class="risk-badge" id="risk-badge" style="opacity:0; transition: opacity 0.5s;">
+      <div class="risk-badge-row">
+        <span class="risk-score-num">8</span>
+        <div>
+          <div class="risk-badge-label">Risk Score / 10</div>
+          <div style="font-size:10px;color:var(--red);letter-spacing:0.12em;text-transform:uppercase;">⚠ Critical — Block Recommended</div>
+        </div>
+      </div>
+      <ul class="risk-reasons">
+        <li>Modifies <code style="color:var(--red)">src/payments/</code> — owned by PCI-locked Payments team</li>
+        <li>Touches <code style="color:var(--accent)">auth_middleware.go</code> — 2 incidents in 90 days</li>
+        <li>Deploy freeze active — Friday 18:00 UTC → Monday 08:00 UTC</li>
+        <li>Author is AI agent, not Payments team member</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-wrap">
+  <div class="marquee-track" id="marquee-track">
+    <!-- items duplicated in JS -->
+  </div>
+</div>
+
+<!-- WHY NOW -->
+<section class="why-now" id="why">
+  <div class="why-now-left">
+    <div class="section-label">Why This Moment</div>
+    <h2 class="section-h2">The exact<br/><em>inflection</em><br/>point</h2>
+    <p class="section-sub">
+      Three things converged in 2026: agents crossed the autonomy threshold,
+      enterprises hit organizational context failures at scale, and MCP became 
+      a real distribution standard.
+    </p>
+    <div style="margin-top:36px; padding:20px; border:1px solid var(--border); background:var(--surface);">
+      <div class="section-label" style="margin-bottom:12px;">The Product Law</div>
+      <p style="font-size:12px;color:var(--text-mid);line-height:1.8;">
+        Impossible before MCP existed.<br/>
+        Unnecessary before agents were autonomous.<br/>
+        <strong style="color:var(--accent);">Both became true 18 months ago.</strong>
+      </p>
+    </div>
+  </div>
+  <div class="why-now-right">
+    <div class="timeline">
+      <div class="tl-item" data-year="2020">
+        <div class="tl-year">2020</div>
+        <div>
+          <div class="tl-content-title">Pain doesn't exist yet</div>
+          <div class="tl-content-text">No AI writing production code. The problem is theoretical. Nothing to build.</div>
+        </div>
+      </div>
+      <div class="tl-item" data-year="2022">
+        <div class="tl-year">2022</div>
+        <div>
+          <div class="tl-content-title">GitHub Copilot — autocomplete era</div>
+          <div class="tl-content-text">Unit of work: one line or function. Context failures are embarrassing, not catastrophic. The human is still in every loop.</div>
+        </div>
+      </div>
+      <div class="tl-item" data-year="2024">
+        <div class="tl-year">2024</div>
+        <div>
+          <div class="tl-content-title">Agentic coding emerges</div>
+          <div class="tl-content-text">Claude, GPT-4, Cursor ship as agents. Adoption still individual. Volume low enough that failures are recoverable.</div>
+        </div>
+      </div>
+      <div class="tl-item active" data-year="2026">
+        <div class="tl-year">2026</div>
+        <div>
+          <div class="tl-inflection">↯ Inflection Point</div>
+          <div class="tl-content-title">All three forces converge</div>
+          <div class="tl-content-text">Agents execute multi-sprint tasks autonomously. Enterprises hit the wall. MCP becomes the distribution channel. The window opened.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAILURES -->
+<section class="failures" id="failures">
+  <div class="failures-header">
+    <div>
+      <div class="section-label">The Problem Space</div>
+      <h2 class="section-h2">Where agents<br/><em>break things</em></h2>
+    </div>
+    <div style="display:flex;align-items:center;">
+      <p class="section-sub">The top 4 failures account for ~80% of economic damage. Build for these 4 and you reach $10M ARR.</p>
+    </div>
+  </div>
+  <div class="failure-grid">
+    <div class="failure-card">
+      <div class="float-num">01</div>
+      <div class="failure-num">01</div>
+      <div class="failure-title">Ownership Violation</div>
+      <div class="failure-text">Agent modifies a PCI-locked module without knowing it belongs to a restricted team. No human catches it. Merges at 2am.</div>
+      <span class="failure-tag tag-critical">Critical</span>
+    </div>
+    <div class="failure-card">
+      <div class="float-num">02</div>
+      <div class="failure-num">02</div>
+      <div class="failure-title">Silent Downstream Breakage</div>
+      <div class="failure-text">Agent refactors a utility function. 14 services depend on it. None break immediately. Production fails 6 days later.</div>
+      <span class="failure-tag tag-critical">Critical</span>
+    </div>
+    <div class="failure-card">
+      <div class="float-num">03</div>
+      <div class="failure-num">03</div>
+      <div class="failure-title">Incident Recurrence</div>
+      <div class="failure-text">The same auth_middleware bug was fixed 8 months ago. Agent rewrites the file, reintroduces the pattern. Nobody remembers.</div>
+      <span class="failure-tag tag-high">High</span>
+    </div>
+    <div class="failure-card">
+      <div class="float-num">04</div>
+      <div class="failure-num">04</div>
+      <div class="failure-title">Compliance Blindness</div>
+      <div class="failure-text">Agent writes GDPR-relevant data to a logging path. Neither the agent nor the reviewer knows the field contains PII.</div>
+      <span class="failure-tag tag-critical">Critical</span>
+    </div>
+    <div class="failure-card">
+      <div class="failure-num">05</div>
+      <div class="failure-title">Freeze Violation</div>
+      <div class="failure-text">Deploy freeze is active. Agent doesn't know. Opens and merges a PR against a locked release branch.</div>
+      <span class="failure-tag tag-high">High</span>
+    </div>
+    <div class="failure-card">
+      <div class="failure-num">06</div>
+      <div class="failure-title">Blast Radius Blindness</div>
+      <div class="failure-text">Agent touches 47 files in a single PR. Change size correlates with incident rate. No score, no review escalation.</div>
+      <span class="failure-tag tag-high">High</span>
+    </div>
+    <div class="failure-card">
+      <div class="failure-num">07</div>
+      <div class="failure-title">Missing Review Routing</div>
+      <div class="failure-text">PR touches payments, auth, and logging across three teams. Goes to one random reviewer who approves it in 4 minutes.</div>
+      <span class="failure-tag tag-med">Medium</span>
+    </div>
+    <div class="failure-card">
+      <div class="failure-num">08</div>
+      <div class="failure-title">Architectural Drift</div>
+      <div class="failure-text">Agent adds Redis dependency to a service that ADRs decree must remain stateless. Nobody checked the architecture decision record.</div>
+      <span class="failure-tag tag-med">Medium</span>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+  <div class="how-left">
+    <div class="section-label">The Wedge</div>
+    <h2 class="section-h2">Change Risk<br/><em>Scoring</em></h2>
+    <p class="section-sub">One API call: here's a diff, what's the risk? The score lands in CI/CD before the PR merges. No new workflow. No new tools.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Agent opens a PR</div>
+          <div class="step-text">Any PR authored by an AI agent (detected via commit author or label) triggers the ContextHub webhook.</div>
+          <div class="step-code">on: pull_request → contexthub/score</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">We analyze in seconds</div>
+          <div class="step-text">Files changed, CODEOWNERS, blast radius, deployment freeze state, PII patterns, incident history — all in one pass.</div>
+          <div class="step-code">score_change(files, diff, agent_id) → RiskScore</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Score lands on the PR</div>
+          <div class="step-text">Risk 1–10 with 3–5 sentence explanation posted as PR comment. High scores trigger Slack alert to the owning team.</div>
+          <div class="step-code">Risk: 8/10 — Block recommended → #platform-eng</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Data compounds over time</div>
+          <div class="step-text">Every scored PR teaches the model which signals predict real incidents. After 6 months, your instance is dramatically smarter.</div>
+          <div class="step-code">outcome_correlation → proprietary model upgrade</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="how-right">
+    <div class="section-label" style="margin-bottom:32px;">MCP API Surface</div>
+    <div class="mcp-panel">
+      <div class="mcp-header">
+        <span class="mcp-title">contexthub mcp server — v0.4.1</span>
+        <span class="mcp-status"><div class="mcp-dot"></div> Connected</span>
+      </div>
+      <div class="mcp-body">
+        <div class="mcp-tool">
+          <div class="mcp-tool-header">
+            score_change
+            <span class="mcp-tool-type">tool</span>
+          </div>
+          <div class="mcp-tool-body">
+            <span class="mcp-param">files</span><span class="mcp-type">: string[]</span>, 
+            <span class="mcp-param">diff</span><span class="mcp-type">: string</span>, 
+            <span class="mcp-param">agent_id</span><span class="mcp-type">: string</span><br/>
+            → <span style="color:var(--green)">RiskScore</span> — risk (1–10), reasoning, suggested reviewers
+          </div>
+        </div>
+        <div class="mcp-tool">
+          <div class="mcp-tool-header">
+            get_ownership
+            <span class="mcp-tool-type">tool</span>
+          </div>
+          <div class="mcp-tool-body">
+            <span class="mcp-param">file_path</span><span class="mcp-type">: string</span><br/>
+            → <span style="color:var(--green)">OwnershipContext</span> — team, slack handle, restrictions, availability
+          </div>
+        </div>
+        <div class="mcp-tool">
+          <div class="mcp-tool-header">
+            get_constraints
+            <span class="mcp-tool-type">tool</span>
+          </div>
+          <div class="mcp-tool-body">
+            <span class="mcp-param">scope</span><span class="mcp-type">: string</span><br/>
+            → <span style="color:var(--green)">Constraints</span> — deploy windows, compliance, fragile patterns, ADRs
+          </div>
+        </div>
+        <div class="mcp-tool" style="border-color:rgba(71,168,232,0.2);">
+          <div class="mcp-tool-header" style="color:var(--blue);">
+            context://incidents/{service}
+            <span class="mcp-tool-type">resource</span>
+          </div>
+          <div class="mcp-tool-body">
+            Recent incidents, root causes, and code patterns that triggered them — streamed to the agent before it modifies a service.
+          </div>
+        </div>
+        <div style="margin-top:16px;padding:14px;background:rgba(232,197,71,0.05);border:1px solid rgba(232,197,71,0.15);font-size:11px;color:var(--text-dim);">
+          <span style="color:var(--accent);font-weight:600;">safe_agent_preamble</span> — drop this prompt fragment into your Claude Code config. The agent starts calling context tools before touching any file. Zero workflow change.
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:20px;border:1px solid var(--border);background:var(--surface);font-size:12px;">
+      <div style="color:var(--text-dim);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px;">Compatible agents</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <span style="padding:5px 12px;border:1px solid var(--border-bright);color:var(--text-mid);font-size:10px;">Cursor</span>
+        <span style="padding:5px 12px;border:1px solid var(--border-bright);color:var(--text-mid);font-size:10px;">Claude Code</span>
+        <span style="padding:5px 12px;border:1px solid var(--border-bright);color:var(--text-mid);font-size:10px;">Devin</span>
+        <span style="padding:5px 12px;border:1px solid var(--border-bright);color:var(--text-mid);font-size:10px;">OpenHands</span>
+        <span style="padding:5px 12px;border:1px solid var(--border-bright);color:var(--text-mid);font-size:10px;">Windsurf</span>
+        <span style="padding:5px 12px;border:1px solid rgba(232,197,71,0.3);color:var(--accent);font-size:10px;">+ Any MCP Agent</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- METRICS -->
+<section class="metrics" id="metrics">
+  <div class="metrics-top">
+    <div class="metric-card fade-in">
+      <div class="metric-num"><span class="count-up" data-target="80">0</span><sup>%</sup></div>
+      <div class="metric-label">of damage, 4 failure types</div>
+      <div class="metric-sub">Ownership violation, downstream breakage, incident recurrence, compliance blindness. Fix these four, reach $10M ARR.</div>
+    </div>
+    <div class="metric-card fade-in" style="transition-delay:0.1s;">
+      <div class="metric-num"><span class="count-up" data-target="18">0</span><sup>mo</sup></div>
+      <div class="metric-label">before GitHub ships native</div>
+      <div class="metric-sub">The window to become the industry standard before Microsoft adds agent risk scoring to Copilot Enterprise. The clock is running.</div>
+    </div>
+    <div class="metric-card fade-in" style="transition-delay:0.2s;">
+      <div class="metric-num"><span class="count-up" data-target="30">0</span></div>
+      <div class="metric-label">customers to $1M ARR</div>
+      <div class="metric-sub">30 customers at $2,500/month = $900K ARR. Achievable in 12–15 months with no enterprise sales motion.</div>
+    </div>
+  </div>
+  <div class="metrics-bottom">
+    <div class="metrics-quote fade-in">
+      <div class="quote-bar"></div>
+      <div class="quote-text">
+        "The agent doesn't know that <em>auth_legacy serves 40% of revenue</em> and nobody touches it on Fridays."
+      </div>
+      <div class="quote-attr">— The incident that created this company</div>
+    </div>
+    <div class="metrics-cta fade-in" style="transition-delay:0.15s;">
+      <div class="section-label">Ready to ship</div>
+      <p>Install the GitHub App in 10 minutes. No CODEOWNERS migration, no workflow changes, no security review needed for the trial. The score appears on your next agent-generated PR.</p>
+      <a href="#" class="btn-primary" style="display:inline-flex;width:fit-content;">Request Early Access</a>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="pricing-header">
+    <div class="section-label">Pricing</div>
+    <h2 class="section-h2">Simple. Usage-based.<br/><em>No surprises.</em></h2>
+  </div>
+  <div class="pricing-grid">
+    <div class="price-card fade-in">
+      <div class="price-tier">Starter</div>
+      <div class="price-amount"><span>$</span>500</div>
+      <div class="price-period">/ month · up to 20 engineers</div>
+      <ul class="price-features">
+        <li>GitHub App + GitLab webhook</li>
+        <li>Risk scoring on agent PRs</li>
+        <li>CODEOWNERS integration</li>
+        <li>Slack alerts on score ≥ 7</li>
+        <li>30-day dashboard</li>
+      </ul>
+      <a href="#" class="price-cta">Start Trial</a>
+    </div>
+    <div class="price-card featured fade-in" style="transition-delay:0.1s;">
+      <div class="price-tier featured-label">Platform → Most Popular</div>
+      <div class="price-amount"><span>$</span>2,500</div>
+      <div class="price-period">/ month · up to 100 engineers</div>
+      <ul class="price-features">
+        <li>Everything in Starter</li>
+        <li>MCP server (all 3 tools)</li>
+        <li>Incident history ingestion</li>
+        <li>Multi-repo analysis</li>
+        <li>Custom risk keywords</li>
+        <li>Deployment freeze config</li>
+        <li>90-day dashboard + exports</li>
+      </ul>
+      <a href="#" class="price-cta featured-cta">Request Access</a>
+    </div>
+    <div class="price-card fade-in" style="transition-delay:0.2s;">
+      <div class="price-tier">Enterprise</div>
+      <div class="price-amount" style="font-size:36px;">Custom</div>
+      <div class="price-period">/ year · 500+ engineers</div>
+      <ul class="price-features">
+        <li>Everything in Platform</li>
+        <li>SSO + SAML</li>
+        <li>SOC 2 Type II report</li>
+        <li>Dedicated onboarding</li>
+        <li>SLA 99.9% uptime</li>
+        <li>Audit logs + SIEM export</li>
+        <li>Founder-led implementation</li>
+      </ul>
+      <a href="#" class="price-cta">Talk to Founder</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">
+    <span class="nav-logo">Context<span>Hub</span> AI</span>
+    <p>The context layer between autonomous AI agents and enterprise codebases.</p>
+  </div>
+  <div class="footer-col">
+    <h4>Product</h4>
+    <ul>
+      <li><a href="#">Risk Scoring</a></li>
+      <li><a href="#">MCP Server</a></li>
+      <li><a href="#">GitHub App</a></li>
+      <li><a href="#">API Docs</a></li>
+      <li><a href="#">Changelog</a></li>
+    </ul>
+  </div>
+  <div class="footer-col">
+    <h4>Company</h4>
+    <ul>
+      <li><a href="#">About</a></li>
+      <li><a href="#">Blog</a></li>
+      <li><a href="#">Careers</a></li>
+      <li><a href="#">Contact</a></li>
+    </ul>
+  </div>
+  <div class="footer-col">
+    <h4>Legal</h4>
+    <ul>
+      <li><a href="#">Privacy</a></li>
+      <li><a href="#">Terms</a></li>
+      <li><a href="#">Security</a></li>
+      <li><a href="#">Status</a></li>
+    </ul>
+  </div>
+</footer>
+<div class="footer-bottom">
+  <p>© 2026 ContextHub AI, Inc. All rights reserved.</p>
+  <p style="color:var(--text-dim);">Built for the agentic era · MCP Native</p>
+</div>
+
+<script>
+  // MARQUEE
+  const items = [
+    { text: 'Change Risk Scoring', accent: null },
+    { text: 'MCP Native', accent: '↯' },
+    { text: 'Ownership Intelligence', accent: null },
+    { text: 'CI/CD Integration', accent: '→' },
+    { text: 'Agent Safety Layer', accent: null },
+    { text: 'PCI Compliance Aware', accent: '⊠' },
+    { text: 'Incident Correlation', accent: null },
+    { text: 'Deploy Freeze Aware', accent: '⊡' },
+  ];
+  const track = document.getElementById('marquee-track');
+  const makeItems = () => items.map(i => {
+    const d = document.createElement('div');
+    d.className = 'marquee-item';
+    d.innerHTML = i.accent ? `<span>${i.accent}</span> ${i.text}` : i.text;
+    return d;
+  });
+  [...makeItems(), ...makeItems()].forEach(el => track.appendChild(el));
+
+  // TERMINAL TYPEWRITER
+  const termLines = [
+    { type: 'cmd', prompt: '$', text: 'contexthub score-change --pr 2847' },
+    { type: 'comment', text: '# Analyzing diff — 23 files changed...' },
+    { type: 'blank' },
+    { type: 'output', text: 'ownership      → payments-team [RESTRICTED]' },
+    { type: 'output', text: 'files_changed  → 23  blast_radius: HIGH' },
+    { type: 'output', text: 'pii_patterns   → 3 matches in src/payments/' },
+    { type: 'output', text: 'incidents_90d  → auth_middleware: 2 incidents' },
+    { type: 'output', text: 'deploy_freeze  → ACTIVE (Fri 18:00 → Mon 08:00)' },
+    { type: 'output', text: 'author         → agent:cursor-prod [NOT OWNER]' },
+    { type: 'blank' },
+    { type: 'risk', text: 'RISK SCORE: 8/10 ——— BLOCK RECOMMENDED' },
+    { type: 'blank' },
+    { type: 'comment', text: '# Notifying #platform-eng on Slack...' },
+    { type: 'output', text: 'alert_sent     → ✓ @payments-team pinged' },
+  ];
+
+  const tb = document.getElementById('terminal-body');
+  let lineIdx = 0;
+
+  function renderLine(line) {
+    const div = document.createElement('div');
+    if (line.type === 'blank') { div.className = 't-blank'; tb.appendChild(div); return; }
+    div.className = 't-line';
+    if (line.type === 'cmd') {
+      div.innerHTML = `<span class="t-prompt">${line.prompt}</span><span class="t-cmd"></span>`;
+      tb.appendChild(div);
+      typeText(div.querySelector('.t-cmd'), line.text, 40, nextLine);
+      return;
+    }
+    if (line.type === 'comment') {
+      div.innerHTML = `<span class="t-comment">${line.text}</span>`;
+    } else if (line.type === 'risk') {
+      div.innerHTML = `<span class="t-risk-high">${line.text}</span>`;
+    } else {
+      const [key, val] = line.text.split(' → ');
+      div.innerHTML = `<span class="t-output"><span class="t-key">${key.padEnd(15)}</span> <span style="color:var(--text-dim)">→</span> <span class="t-val">${val}</span></span>`;
+    }
+    tb.appendChild(div);
+    setTimeout(nextLine, line.type === 'comment' ? 300 : 150);
+  }
+
+  function nextLine() {
+    if (lineIdx < termLines.length) {
+      renderLine(termLines[lineIdx++]);
+    } else {
+      setTimeout(() => { document.getElementById('risk-badge').style.opacity = '1'; }, 400);
+    }
+  }
+
+  function typeText(el, text, speed, cb) {
+    let i = 0;
+    const iv = setInterval(() => {
+      el.textContent = text.slice(0, ++i);
+      if (i >= text.length) { clearInterval(iv); setTimeout(cb, 200); }
+    }, speed);
+  }
+
+  setTimeout(() => nextLine(), 800);
+
+  // SCROLL ANIMATIONS
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.tl-item, .failure-card, .step, .fade-in').forEach(el => {
+    observer.observe(el);
+  });
+
+  // STAGGER FAILURE CARDS
+  document.querySelectorAll('.failure-card').forEach((card, i) => {
+    card.style.transitionDelay = (i * 0.07) + 's';
+  });
+  document.querySelectorAll('.step').forEach((step, i) => {
+    step.style.transitionDelay = (i * 0.1) + 's';
+  });
+
+  // COUNT UP
+  const countObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const target = parseInt(el.dataset.target);
+        let current = 0;
+        const step = target / 60;
+        const iv = setInterval(() => {
+          current = Math.min(current + step, target);
+          el.textContent = Math.floor(current);
+          if (current >= target) clearInterval(iv);
+        }, 20);
+        countObserver.unobserve(el);
+      }
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.count-up').forEach(el => countObserver.observe(el));
+</script>
+</body>
+</html>
