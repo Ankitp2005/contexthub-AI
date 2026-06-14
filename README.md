@@ -1,8 +1,20 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ContextHub AI
+
+Risk intelligence layer for AI-generated code.
+
+ContextHub analyzes pull requests and provides organizational risk scoring before code reaches production.
+
+**Status:** MVP Development Complete (All 76 tests passing)
+
+---
 
 ## Getting Started
 
-First, run the development server:
+First, configure your environment variables:
+1. Copy `.env.example` to `.env.local`
+2. Update the credentials for database connection (`DATABASE_URL`), Clerk, GitHub App, and other third-party services.
+
+Run the development server:
 
 ```bash
 npm run dev
@@ -14,11 +26,7 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the dashboard.
 
 ## Learn More
 
