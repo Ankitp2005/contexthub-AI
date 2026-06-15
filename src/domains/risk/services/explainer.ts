@@ -154,13 +154,61 @@ async function callOpenAI(
   return content;
 }
 
+async function callGemini(
+  systemPrompt: string,
+  userPrompt: string,
+  apiKey: string,
+): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `${systemPrompt}\n\nInput data to summarize:\n${userPrompt}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          maxOutputTokens: 200,
+          temperature: 0,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Gemini API error: ${response.status} ${response.statusText} — ${errorText}`
+    );
+  }
+
+  const data = (await response.json()) as any;
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+  if (!content) {
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  return content;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * explainRiskAssessment — Generates a human-readable explanation of a risk
- * assessment by passing the stored factors to an LLM.
+ * assessment by passing the stored factors to an LLM (Gemini or OpenAI).
  *
  * The LLM is strictly constrained to the explanation role:
  *  - It receives only the score, level, and triggered factors.
@@ -182,7 +230,15 @@ export async function explainRiskAssessment(
   try {
     const systemPrompt = buildSystemPrompt();
     const userPrompt = buildUserPrompt(input);
-    const summary = await callOpenAI(systemPrompt, userPrompt);
+
+    let summary: string;
+    const geminiKey = process.env.GEMENI_API_KEY || process.env.GEMINI_API_KEY;
+
+    if (geminiKey) {
+      summary = await callGemini(systemPrompt, userPrompt, geminiKey);
+    } else {
+      summary = await callOpenAI(systemPrompt, userPrompt);
+    }
 
     return { summary, aiGenerated: true };
   } catch {

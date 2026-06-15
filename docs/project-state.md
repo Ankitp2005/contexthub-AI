@@ -62,7 +62,7 @@ Deliverables:
 
 Status: ✅ Complete
 
-Completed: 2026-06-14
+Completed: 2026-06-15
 
 Deliverables:
 - Implemented Zod schema validations for Dashboard POST endpoints `/api/constraints` and `/api/incidents` to prevent parameter injection.
@@ -72,7 +72,9 @@ Deliverables:
 - Patched IP spoofing and malformed IP address key vulnerabilities in the sliding-window rate-limiting middleware.
 - Added verification in the GitHub callback handler to check repository installation ownership and prevent cross-tenant hijacking of existing installations.
 - Implemented timing-safe API key comparison for global `MCP_API_KEY` token check using SHA-256 digests.
-- Added unit test suite covering key comparison and IP resolution helpers, verifying all 76 tests pass successfully.
+- Added native support for the Gemini API (`gemini-2.5-flash`) inside the risk explanation engine, enabling seamless integration with the newly configured `GEMENI_API_KEY` environment variable.
+- Created a dedicated unit test suite for the risk explainer (`explainer.test.ts`), confirming correct API routing and payload format for Gemini, OpenAI, and deterministic template fallbacks.
+- Verified all 77 tests pass successfully with strict compilation checks.
 
 ---
 
