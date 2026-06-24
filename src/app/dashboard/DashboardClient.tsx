@@ -108,6 +108,9 @@ export default function DashboardClient({
   const [isIncSubmitting, setIsIncSubmitting] = useState(false);
   const [incFormError, setIncFormError] = useState("");
 
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState("");
+
   // Animation Trigger
   const [animateWidths, setAnimateWidths] = useState(false);
   useEffect(() => {
@@ -237,6 +240,36 @@ export default function DashboardClient({
       paddingBottom,
     };
   }, [prs]);
+
+  const handleScanNow = async () => {
+    setIsScanning(true);
+    setScanFeedback("Triggering scan...");
+    try {
+      const res = await fetch("/api/repositories/scan", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to trigger scan");
+      }
+      const scannedCount = data.scanned?.length || 0;
+      const skippedCount = data.skipped?.length || 0;
+      if (scannedCount > 0) {
+        setScanFeedback(`Scan triggered for ${scannedCount} repo(s).`);
+      } else if (skippedCount > 0) {
+        setScanFeedback("All repos currently scanning.");
+      } else {
+        setScanFeedback("No repos found to scan.");
+      }
+      setTimeout(() => setScanFeedback(""), 5000);
+      router.refresh();
+    } catch (err) {
+      setScanFeedback(err instanceof Error ? err.message : "Error running scan");
+      setTimeout(() => setScanFeedback(""), 5000);
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   // Form Submitter for adding constraint
   const handleAddConstraint = async (e: React.FormEvent) => {
@@ -1315,9 +1348,14 @@ export default function DashboardClient({
               </button>
             </div>
           </div>
-          <div className="topbar-right">
-            <button onClick={() => router.refresh()} className="topbar-btn ghost">
-              ↯ Scan Now
+          <div className="topbar-right" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {scanFeedback && (
+              <span style={{ fontSize: "10.5px", color: "var(--accent)", fontFamily: "var(--mono)", letterSpacing: "0.03em" }}>
+                {scanFeedback}
+              </span>
+            )}
+            <button onClick={handleScanNow} disabled={isScanning} className="topbar-btn ghost">
+              {isScanning ? "⚡ Scanning..." : "↯ Scan Now"}
             </button>
             <a href={installUrl} className="topbar-btn" style={{ textDecoration: "none" }}>
               + Connect Repo

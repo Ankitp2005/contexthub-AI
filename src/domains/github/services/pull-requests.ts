@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getInstallationAccessToken } from "./index";
 import type { GitHubPRFile } from "../types";
 
@@ -33,4 +34,25 @@ export async function listPullRequestFiles(
   }
 
   return response.json() as Promise<GitHubPRFile[]>;
+}
+
+export async function listRepositoryPullRequests(
+  installationId: number,
+  owner: string,
+  repo: string,
+  state: "open" | "closed" | "all" = "open"
+): Promise<any[]> {
+  const token = await getInstallationAccessToken(installationId);
+  const response = await fetch(
+    `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls?state=${state}&per_page=50`,
+    { headers: bearerHeaders(token) }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to list PRs for repository ${owner}/${repo}: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json() as Promise<any[]>;
 }

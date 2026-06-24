@@ -148,4 +148,5 @@ export async function listInstallationRepositories(
 
 export * from "./pr-comment";
 export * from "./check-runs";
+export * from "./pull-requests";
 

@@ -46,6 +46,8 @@ export const repositories = pgTable("repositories", {
   full_name: text("full_name").notNull(),
   default_branch: text("default_branch").notNull(),
   visibility: text("visibility").notNull(),
+  syncing_at: timestamp("syncing_at"),
+  last_scanned_at: timestamp("last_scanned_at"),
   created_at: timestamp("created_at").notNull().defaultNow(),
   updated_at: timestamp("updated_at").notNull().defaultNow(),
 });

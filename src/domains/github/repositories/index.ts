@@ -143,3 +143,23 @@ export async function deleteInstallationByGitHubId(githubInstallationId: number)
     .delete(github_installations)
     .where(eq(github_installations.github_installation_id, githubInstallationId));
 }
+
+export async function updateRepositorySyncState(
+  id: string,
+  syncingAt: Date | null,
+  lastScannedAt?: Date | null
+) {
+  const updateData: Record<string, unknown> = {
+    syncing_at: syncingAt,
+    updated_at: new Date(),
+  };
+  if (lastScannedAt !== undefined) {
+    updateData.last_scanned_at = lastScannedAt;
+  }
+  const [updated] = await db
+    .update(repositories)
+    .set(updateData)
+    .where(eq(repositories.id, id))
+    .returning();
+  return updated ?? null;
+}
