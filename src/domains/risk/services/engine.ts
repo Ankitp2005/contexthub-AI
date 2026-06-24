@@ -22,6 +22,8 @@ const WEIGHT_RECENT_INCIDENT = 2;
 const WEIGHT_LARGE_CHANGE_SET = 1;        // triggered when changedFiles > 25
 const WEIGHT_EXCESSIVE_LOC = 1;           // triggered when changedLines > 500
 const WEIGHT_MULTIPLE_CRITICAL_SERVICES = 2; // triggered when criticalPathCount >= 2
+const WEIGHT_BLAST_RADIUS_PER_DEP = 1;    // +1 per direct dependent, capped at +3
+const WEIGHT_BLAST_RADIUS_MAX = 3;
 
 const THRESHOLD_LARGE_CHANGE_SET = 25;
 const THRESHOLD_EXCESSIVE_LOC = 500;
@@ -78,6 +80,7 @@ function resolveLevel(score: number): RiskLevel {
  *  │ LargeChangeSet               │   +1   │ changedFiles > 25                │
  *  │ ExcessiveLOC                 │   +1   │ changedLines > 500               │
  *  │ MultipleCriticalServices     │   +2   │ criticalPathCount >= 2           │
+ *  │ HighBlastRadius              │  +1–3  │ directDependentCount >= 1        │
  *  └──────────────────────────────┴────────┴──────────────────────────────────┘
  *
  * @param input - Validated RiskInput.
@@ -147,6 +150,20 @@ export function generateRiskFactors(input: RiskInput): RiskFactor[] {
       name: "MultipleCriticalServices",
       weight: WEIGHT_MULTIPLE_CRITICAL_SERVICES,
       reason: `PR touches ${input.criticalPathCount} critical services simultaneously.`,
+    });
+  }
+
+  // 7. High Blast Radius (+1 per direct dependent, max +3)
+  const directDeps = input.directDependentCount ?? 0;
+  if (directDeps >= 1) {
+    const blastWeight = Math.min(
+      directDeps * WEIGHT_BLAST_RADIUS_PER_DEP,
+      WEIGHT_BLAST_RADIUS_MAX
+    );
+    factors.push({
+      name: "HighBlastRadius",
+      weight: blastWeight,
+      reason: `This repository has ${directDeps} direct downstream dependent(s) — a change here may break them.`,
     });
   }
 

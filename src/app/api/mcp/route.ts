@@ -30,6 +30,8 @@ import {
   GetImplicitOwnershipInputSchema,
   getBlastRadius,
   GetBlastRadiusInputSchema,
+  getIncidentContextTool,
+  GetIncidentContextInputSchema,
 } from "@/domains/mcp/services";
 import { db } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
@@ -312,6 +314,17 @@ export async function POST(request: NextRequest) {
                     },
                     required: ["repositoryId"]
                   }
+                },
+                {
+                  name: "get_incident_context",
+                  description: "Retrieve incident history for a service: how many incidents, recent ones, and inferred root causes. Use before making changes to incident-prone services.",
+                  inputSchema: {
+                    type: "object",
+                    properties: {
+                      serviceName: { type: "string" }
+                    },
+                    required: ["serviceName"]
+                  }
                 }
               ]
             }
@@ -418,6 +431,17 @@ export async function POST(request: NextRequest) {
               }, { status: 403 });
             }
             const result = await getBlastRadius(parsed.data, organizationId);
+            return NextResponse.json({ jsonrpc, id, result });
+          } else if (name === "get_incident_context") {
+            const parsed = GetIncidentContextInputSchema.safeParse(args);
+            if (!parsed.success) {
+              return NextResponse.json({
+                jsonrpc,
+                id,
+                error: { code: -32602, message: "Invalid input", data: parsed.error.flatten() }
+              }, { status: 400 });
+            }
+            const result = await getIncidentContextTool(parsed.data, organizationId);
             return NextResponse.json({ jsonrpc, id, result });
           } else {
             return NextResponse.json({
@@ -594,9 +618,21 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(result);
         }
 
+        case "get_incident_context": {
+          const parsed = GetIncidentContextInputSchema.safeParse(input);
+          if (!parsed.success) {
+            return NextResponse.json(
+              { error: "Invalid input", details: parsed.error.flatten() },
+              { status: 400 }
+            );
+          }
+          const result = await getIncidentContextTool(parsed.data, organizationId);
+          return NextResponse.json(result);
+        }
+
         default:
           return NextResponse.json(
-            { error: `Unknown tool: ${tool}. Valid tools: score_change, get_ownership, get_constraints, get_implicit_ownership, get_blast_radius` },
+            { error: `Unknown tool: ${tool}. Valid tools: score_change, get_ownership, get_constraints, get_implicit_ownership, get_blast_radius, get_incident_context` },
             { status: 400 }
           );
       }

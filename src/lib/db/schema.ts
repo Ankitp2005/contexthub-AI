@@ -228,3 +228,30 @@ export const dependency_graph = pgTable("dependency_graph", {
   updated_at: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// review_history — tracks which reviewers were suggested/assigned per risk assessment
+export const review_history = pgTable("review_history", {
+  id: text("id").primaryKey(),
+  risk_assessment_id: text("risk_assessment_id").notNull(),
+  pull_request_id: text("pull_request_id").notNull(),
+  suggested_reviewer: text("suggested_reviewer").notNull(),
+  /** suggested | assigned | approved | changes_requested */
+  status: text("status").notNull().default("suggested"),
+  reason: text("reason").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+// agent_feedback — stores explicit thumbs-up/down feedback from agents or engineers
+// on risk assessments, used to improve future scoring quality.
+export const agent_feedback = pgTable("agent_feedback", {
+  id: text("id").primaryKey(),
+  risk_assessment_id: text("risk_assessment_id").notNull(),
+  organization_id: text("organization_id").notNull(),
+  /** thumbs_up | thumbs_down */
+  feedback_type: text("feedback_type").notNull(),
+  /** Optional comment from the reviewer */
+  comment: text("comment"),
+  /** Who submitted the feedback — agent login or Clerk user ID */
+  submitted_by: text("submitted_by"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+

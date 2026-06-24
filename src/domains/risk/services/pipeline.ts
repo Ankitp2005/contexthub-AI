@@ -176,7 +176,8 @@ function buildRiskInput(
   prAuthor: string,
   codeownersContent: string | null,
   deploymentConstraintActive: boolean,
-  hasRecentIncident: boolean
+  hasRecentIncident: boolean,
+  directDependentCount = 0
 ): RiskInput {
   const changedFiles = files.length;
   const changedLines = files.reduce(
@@ -211,6 +212,7 @@ function buildRiskInput(
     hasRecentIncident,
     changedFiles,
     changedLines,
+    directDependentCount,
   };
 }
 

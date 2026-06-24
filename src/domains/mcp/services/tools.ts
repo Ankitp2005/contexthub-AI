@@ -97,6 +97,7 @@ export function buildRiskInputFromContext(ctx: {
     hasRecentIncident: false,    // MCP v1: inferred in a future phase
     changedFiles: ctx.files.length,
     changedLines: countChangedLines(ctx.diff),
+    directDependentCount: 0,     // MCP v1: agents can call get_blast_radius for this
   };
 }
 

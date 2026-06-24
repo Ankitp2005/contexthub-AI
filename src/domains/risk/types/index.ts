@@ -26,6 +26,14 @@ export interface RiskInput {
 
   /** Total lines changed (additions + deletions) by the PR. */
   changedLines: number;
+
+  /**
+   * Number of repositories that directly depend on this repository.
+   * Sourced from the dependency_graph table computed during background scanning.
+   * 0 when the repo has no tracked dependents.
+   * @default 0
+   */
+  directDependentCount?: number;
 }
 
 /**

@@ -45,5 +45,11 @@ export type {
   GetBlastRadiusInput,
   BlastRadiusResult,
 } from "./blast-radius";
-
-
+export {
+  getIncidentContextTool,
+  GetIncidentContextInputSchema,
+} from "./incident-tool";
+export type {
+  GetIncidentContextInput,
+  IncidentContextResource,
+} from "./incident-tool";
