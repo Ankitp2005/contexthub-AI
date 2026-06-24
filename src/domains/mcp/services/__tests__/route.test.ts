@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { test } from "node:test";
 import assert from "node:assert";
 import { POST } from "../../../../app/api/mcp/route";
@@ -286,4 +287,74 @@ test("POST /api/mcp custom simplified tool call returns 403 when repo is not own
     db.select = originalSelect;
   }
 });
+
+test("POST /api/mcp standard JSON-RPC 2.0 list prompts", async () => {
+  const req = new NextRequest("http://localhost/api/mcp", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer mock-api-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "prompts/list",
+      id: 10,
+    }),
+  });
+
+  const res = await POST(req);
+  assert.strictEqual(res.status, 200);
+  const json = await res.json();
+  assert.strictEqual(json.jsonrpc, "2.0");
+  assert.strictEqual(json.id, 10);
+  assert.ok(json.result.prompts);
+  assert.strictEqual(json.result.prompts[0].name, "safe_agent_preamble");
+});
+
+test("POST /api/mcp standard JSON-RPC 2.0 get prompt", async () => {
+  const req = new NextRequest("http://localhost/api/mcp", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer mock-api-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "prompts/get",
+      params: {
+        name: "safe_agent_preamble",
+      },
+      id: 11,
+    }),
+  });
+
+  const res = await POST(req);
+  assert.strictEqual(res.status, 200);
+  const json = await res.json();
+  assert.strictEqual(json.id, 11);
+  assert.ok(json.result.messages);
+  assert.strictEqual(json.result.messages[0].role, "user");
+  assert.ok(json.result.messages[0].content.text.includes("get_ownership"));
+});
+
+test("POST /api/mcp custom simplified prompt query", async () => {
+  const req = new NextRequest("http://localhost/api/mcp", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer mock-api-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt: "safe_agent_preamble",
+    }),
+  });
+
+  const res = await POST(req);
+  assert.strictEqual(res.status, 200);
+  const json = await res.json();
+  assert.strictEqual(json.name, "safe_agent_preamble");
+  assert.strictEqual(json.messages[0].role, "user");
+  assert.ok(json.messages[0].content.text.includes("get_ownership"));
+});
+
 

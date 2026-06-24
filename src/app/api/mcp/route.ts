@@ -24,6 +24,8 @@ import {
   GetConstraintsInputSchema,
   getCodebaseContext,
   getIncidentContext,
+  listPrompts,
+  getPrompt,
 } from "@/domains/mcp/services";
 import { db } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Parse body
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let body: any;
   try {
     body = await request.json();
@@ -121,6 +124,44 @@ export async function POST(request: NextRequest) {
 
     try {
       switch (method) {
+        case "prompts/list": {
+          const promptsList = await listPrompts();
+          return NextResponse.json({
+            jsonrpc,
+            id,
+            result: {
+              prompts: promptsList
+            }
+          });
+        }
+
+        case "prompts/get": {
+          const name = params?.name;
+          if (!name || typeof name !== "string") {
+            return NextResponse.json({
+              jsonrpc,
+              id,
+              error: { code: -32602, message: "Invalid params: name is required" }
+            }, { status: 400 });
+          }
+          const prompt = await getPrompt(name);
+          if (!prompt) {
+            return NextResponse.json({
+              jsonrpc,
+              id,
+              error: { code: 404, message: `Prompt not found: ${name}` }
+            }, { status: 404 });
+          }
+          return NextResponse.json({
+            jsonrpc,
+            id,
+            result: {
+              description: prompt.description,
+              messages: prompt.messages
+            }
+          });
+        }
+
         case "resources/list": {
           return NextResponse.json({
             jsonrpc,
@@ -365,6 +406,27 @@ export async function POST(request: NextRequest) {
       } else {
         return NextResponse.json({ error: `Unsupported resource URI: ${uri}` }, { status: 400 });
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Internal server error";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Protocol Type D: Custom Simplified Prompt Query
+  // ---------------------------------------------------------------------------
+  if ("prompt" in body) {
+    const name = body.prompt;
+    if (typeof name !== "string") {
+      return NextResponse.json({ error: "prompt field must be a string" }, { status: 400 });
+    }
+
+    try {
+      const prompt = await getPrompt(name);
+      if (!prompt) {
+        return NextResponse.json({ error: `Prompt not found: ${name}` }, { status: 404 });
+      }
+      return NextResponse.json(prompt);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Internal server error";
       return NextResponse.json({ error: message }, { status: 500 });

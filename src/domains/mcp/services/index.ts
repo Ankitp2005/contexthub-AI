@@ -27,3 +27,4 @@ export {
   GetConstraintsInputSchema,
 } from "../schemas";
 export * from "./resources";
+export * from "./prompts";
