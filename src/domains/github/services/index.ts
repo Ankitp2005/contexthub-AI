@@ -26,10 +26,18 @@ function base64url(data: Buffer): string {
 
 export function generateGitHubAppJWT(): string {
   const appId = process.env.GITHUB_APP_ID;
-  const privateKey = (process.env.GITHUB_APP_PRIVATE_KEY ?? "").replace(
-    /\\n/g,
-    "\n"
-  );
+  let privateKey = process.env.GITHUB_APP_PRIVATE_KEY ?? "";
+
+  // Strip wrapping double or single quotes that might be injected by deployment environments
+  if (
+    (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+    (privateKey.startsWith("'") && privateKey.endsWith("'"))
+  ) {
+    privateKey = privateKey.slice(1, -1);
+  }
+
+  // Replace literal \n or escaped newlines with real newlines
+  privateKey = privateKey.replace(/\\n/g, "\n").trim();
 
   if (!appId || !privateKey) {
     throw new Error(
