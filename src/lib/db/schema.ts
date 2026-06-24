@@ -152,3 +152,15 @@ export const mcp_responses = pgTable("mcp_responses", {
   response_payload: text("response_payload").notNull(),
   created_at: timestamp("created_at").notNull().defaultNow(),
 });
+
+// agent_executions
+export const agent_executions = pgTable("agent_executions", {
+  id: text("id").primaryKey(),
+  organization_id: text("organization_id").notNull(),
+  agent_name: text("agent_name").notNull(),
+  repository_id: text("repository_id").notNull(),
+  task_description: text("task_description").notNull(),
+  status: text("status").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  completed_at: timestamp("completed_at"),
+});
