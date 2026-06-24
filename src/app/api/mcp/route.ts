@@ -26,6 +26,8 @@ import {
   getIncidentContext,
   listPrompts,
   getPrompt,
+  getImplicitOwnership,
+  GetImplicitOwnershipInputSchema,
 } from "@/domains/mcp/services";
 import { db } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
@@ -285,6 +287,18 @@ export async function POST(request: NextRequest) {
                     },
                     required: ["repositoryId", "scope"]
                   }
+                },
+                {
+                  name: "get_implicit_ownership",
+                  description: "Return implicit ownership confidence scores for a file path, derived from commit activity. Falls back gracefully when no data is available.",
+                  inputSchema: {
+                    type: "object",
+                    properties: {
+                      repositoryId: { type: "string" },
+                      filePath: { type: "string" }
+                    },
+                    required: ["repositoryId", "filePath"]
+                  }
                 }
               ]
             }
@@ -355,6 +369,24 @@ export async function POST(request: NextRequest) {
               }, { status: 403 });
             }
             const result = await getConstraints(parsed.data);
+            return NextResponse.json({ jsonrpc, id, result });
+          } else if (name === "get_implicit_ownership") {
+            const parsed = GetImplicitOwnershipInputSchema.safeParse(args);
+            if (!parsed.success) {
+              return NextResponse.json({
+                jsonrpc,
+                id,
+                error: { code: -32602, message: "Invalid input", data: parsed.error.flatten() }
+              }, { status: 400 });
+            }
+            if (!(await verifyRepositoryOwnership(parsed.data.repositoryId, organizationId))) {
+              return NextResponse.json({
+                jsonrpc,
+                id,
+                error: { code: 403, message: "Forbidden: Repository does not belong to your organization" }
+              }, { status: 403 });
+            }
+            const result = await getImplicitOwnership(parsed.data);
             return NextResponse.json({ jsonrpc, id, result });
           } else {
             return NextResponse.json({
@@ -495,9 +527,27 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(result);
         }
 
+        case "get_implicit_ownership": {
+          const parsed = GetImplicitOwnershipInputSchema.safeParse(input);
+          if (!parsed.success) {
+            return NextResponse.json(
+              { error: "Invalid input", details: parsed.error.flatten() },
+              { status: 400 }
+            );
+          }
+          if (!(await verifyRepositoryOwnership(parsed.data.repositoryId, organizationId))) {
+            return NextResponse.json(
+              { error: "Forbidden: Repository does not belong to your organization" },
+              { status: 403 }
+            );
+          }
+          const result = await getImplicitOwnership(parsed.data);
+          return NextResponse.json(result);
+        }
+
         default:
           return NextResponse.json(
-            { error: `Unknown tool: ${tool}. Valid tools: score_change, get_ownership, get_constraints` },
+            { error: `Unknown tool: ${tool}. Valid tools: score_change, get_ownership, get_constraints, get_implicit_ownership` },
             { status: 400 }
           );
       }

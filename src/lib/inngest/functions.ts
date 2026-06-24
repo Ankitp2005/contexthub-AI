@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { inngest } from "./client";
 import { db } from "@/lib/db";
 import { repositories, github_installations } from "@/lib/db/schema";
@@ -6,10 +5,13 @@ import { eq } from "drizzle-orm";
 import { updateRepositorySyncState } from "@/domains/github/repositories";
 import { getInstallationAccessToken } from "@/domains/github/services";
 import { listRepositoryPullRequests, listPullRequestFiles } from "@/domains/github/services/pull-requests";
+import { fetchRepositoryCommitStats } from "@/domains/github/services/commits";
 import { upsertPullRequest, clearPullRequestFiles, storePullRequestFiles } from "@/domains/github/repositories/pull-requests";
 import { runRiskPipeline } from "@/domains/risk/services/pipeline";
 import { parseCodeownersFile } from "@/domains/ownership/services";
 import { syncOwnershipRules } from "@/domains/ownership/repositories";
+import { computeOwnershipScores } from "@/domains/ownership/services/confidence";
+import { syncCommitActivity, getCommitActivity, syncImplicitOwnership } from "@/domains/ownership/repositories/commit-activity";
 
 // CODEOWNERS fetching via GitHub Contents API
 async function fetchCodeOwners(
@@ -55,7 +57,9 @@ async function fetchCodeOwners(
 }
 
 export const scanRepository = inngest.createFunction(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   { id: "scan-repository", triggers: [{ event: "repository.scan" }] } as any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async ({ event, step }: any) => {
     const { repositoryId, organizationId } = event.data;
 
@@ -106,7 +110,19 @@ export const scanRepository = inngest.createFunction(
         await syncOwnershipRules(repositoryId, rules);
       });
 
-      // 5. Fetch recent/open Pull Requests
+      // 5. Sync commit activity + compute implicit ownership
+      await step.run("sync-commit-activity", async () => {
+        const stats = await fetchRepositoryCommitStats(token, owner, repoName, 100);
+        await syncCommitActivity(repositoryId, stats);
+      });
+
+      await step.run("compute-implicit-ownership", async () => {
+        const activityRows = await getCommitActivity(repositoryId);
+        const scores = computeOwnershipScores(activityRows, 3);
+        await syncImplicitOwnership(repositoryId, scores);
+      });
+
+      // 6. Fetch recent/open Pull Requests
       const pulls = await step.run("fetch-open-prs", async () => {
         return listRepositoryPullRequests(
           installation.github_installation_id,

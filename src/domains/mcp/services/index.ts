@@ -28,3 +28,13 @@ export {
 } from "../schemas";
 export * from "./resources";
 export * from "./prompts";
+export {
+  getImplicitOwnership,
+  GetImplicitOwnershipInputSchema,
+} from "./implicit-ownership";
+export type {
+  GetImplicitOwnershipInput,
+  GetImplicitOwnershipResult,
+  ImplicitOwnerEntry,
+} from "./implicit-ownership";
+

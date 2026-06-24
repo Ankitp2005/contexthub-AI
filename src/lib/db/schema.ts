@@ -4,7 +4,24 @@ import {
   integer,
   timestamp,
   numeric,
+  customType,
 } from "drizzle-orm/pg-core";
+
+// pgvector custom type for 1536-dimensional vectors
+export const pgVector = customType<{ data: number[]; driverParam: string }>({
+  dataType() {
+    return "vector(1536)";
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value: unknown): number[] {
+    if (typeof value === "string") {
+      return value.replace(/[\[\]]/g, "").split(",").map(Number);
+    }
+    return value as number[];
+  },
+});
 
 // organizations
 export const organizations = pgTable("organizations", {
@@ -106,6 +123,7 @@ export const incidents = pgTable("incidents", {
   severity: text("severity").notNull(),
   description: text("description").notNull(),
   status: text("status").notNull(),
+  description_vector: pgVector("description_vector"),
   created_at: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -153,6 +171,32 @@ export const mcp_responses = pgTable("mcp_responses", {
   mcp_request_id: text("mcp_request_id").notNull(),
   response_payload: text("response_payload").notNull(),
   created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+// commit_activity — stores per-file, per-author commit statistics (synced from GitHub)
+export const commit_activity = pgTable("commit_activity", {
+  id: text("id").primaryKey(),
+  repository_id: text("repository_id").notNull(),
+  file_path: text("file_path").notNull(),
+  author_login: text("author_login").notNull(),
+  commit_count: integer("commit_count").notNull().default(0),
+  additions: integer("additions").notNull().default(0),
+  deletions: integer("deletions").notNull().default(0),
+  last_committed_at: timestamp("last_committed_at"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// implicit_ownership — stores computed confidence scores from the Ownership Confidence Engine
+export const implicit_ownership = pgTable("implicit_ownership", {
+  id: text("id").primaryKey(),
+  repository_id: text("repository_id").notNull(),
+  file_path: text("file_path").notNull(),
+  owner_login: text("owner_login").notNull(),
+  confidence_score: numeric("confidence_score").notNull(), // 0.00 – 100.00
+  commit_count: integer("commit_count").notNull().default(0),
+  total_commits: integer("total_commits").notNull().default(0),
+  computed_at: timestamp("computed_at").notNull().defaultNow(),
 });
 
 // agent_executions
