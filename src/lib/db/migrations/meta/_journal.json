@@ -15,6 +15,13 @@
       "when": 1781453747253,
       "tag": "0001_add_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782317867089,
+      "tag": "0002_rare_banshee",
+      "breakpoints": true
     }
   ]
 }
