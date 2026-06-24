@@ -12,6 +12,8 @@ import {
   findInstallationByGitHubId,
   createInstallation,
   upsertRepository,
+  listRepositoriesByOrganization,
+  deleteRepositoryByGitHubId,
 } from "@/domains/github/repositories";
 import { validateInstallationId } from "@/domains/github/schemas";
 
@@ -68,7 +70,19 @@ export async function GET(request: NextRequest) {
 
     // 5. Discover and sync repositories
     const repos = await listInstallationRepositories(installationId);
+    const activeRepoIds = new Set(repos.map((r) => r.id));
 
+    // Get all existing repos for this organization
+    const existingRepos = await listRepositoriesByOrganization(organization.id);
+
+    // Delete any repositories that are no longer in the active list
+    for (const existing of existingRepos) {
+      if (!activeRepoIds.has(existing.github_repo_id)) {
+        await deleteRepositoryByGitHubId(existing.github_repo_id);
+      }
+    }
+
+    // Upsert active repositories
     for (const repo of repos) {
       await upsertRepository({
         id: crypto.randomUUID(),

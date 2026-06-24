@@ -54,6 +54,19 @@ export async function findInstallationByGitHubId(
   return results[0] ?? null;
 }
 
+export async function findInstallationByOrganizationId(
+  organizationId: string
+) {
+  const results = await db
+    .select()
+    .from(github_installations)
+    .where(eq(github_installations.organization_id, organizationId))
+    .limit(1);
+
+  return results[0] ?? null;
+}
+
+
 export async function createInstallation(data: {
   id: string;
   organization_id: string;

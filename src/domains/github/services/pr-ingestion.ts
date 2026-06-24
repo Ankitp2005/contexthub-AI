@@ -5,7 +5,6 @@ import {
   clearPullRequestFiles,
   storePullRequestFiles,
 } from "../repositories/pull-requests";
-import { findInstallationByGitHubId } from "../repositories";
 import { listPullRequestFiles } from "./pull-requests";
 import { runRiskPipeline } from "@/domains/risk/services/pipeline";
 

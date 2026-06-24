@@ -1,6 +1,9 @@
 import { UserButton } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { listRepositoriesByOrganization } from "@/domains/github/repositories";
+import {
+  listRepositoriesByOrganization,
+  findInstallationByOrganizationId,
+} from "@/domains/github/repositories";
 import { listPullRequestsWithAssessmentsForOrganization } from "@/domains/github/repositories/pull-requests";
 import { getConstraintsForOrganization } from "@/domains/constraints/repositories";
 import { getIncidentsForOrganization } from "@/domains/incidents/repositories";
@@ -19,17 +22,21 @@ export default async function DashboardPage() {
     redirect("/sign-in");
   }
 
-  const githubAppSlug = process.env.NEXT_PUBLIC_GITHUB_APP_SLUG ?? "";
-  const installUrl = `https://github.com/apps/${githubAppSlug}/installations/new`;
-
-  // Fetch user profile info, repositories, pull requests, constraints, and incidents
-  const [user, repos, prs, constraints, incidentsList] = await Promise.all([
+  // Fetch user profile info, repositories, pull requests, constraints, incidents, and installation
+  const [user, repos, prs, constraints, incidentsList, installation] = await Promise.all([
     currentUser(),
     listRepositoriesByOrganization(userId),
     listPullRequestsWithAssessmentsForOrganization(userId),
     getConstraintsForOrganization(userId),
     getIncidentsForOrganization(userId),
+    findInstallationByOrganizationId(userId),
   ]);
+
+  const githubAppSlug = process.env.NEXT_PUBLIC_GITHUB_APP_SLUG ?? "";
+  const installUrl = installation
+    ? `https://github.com/settings/installations/${installation.github_installation_id}`
+    : `https://github.com/apps/${githubAppSlug}/installations/new`;
+
 
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? "admin@acme.io";
   const userInitials =
