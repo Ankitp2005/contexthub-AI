@@ -210,3 +210,21 @@ export const agent_executions = pgTable("agent_executions", {
   created_at: timestamp("created_at").notNull().defaultNow(),
   completed_at: timestamp("completed_at"),
 });
+
+// dependency_graph — directed edges: repository → package it depends on
+// Each row: source_repository_id depends on `package_name@package_version`
+// `dependent_repository_id` is set when the package is also a known internal repo.
+export const dependency_graph = pgTable("dependency_graph", {
+  id: text("id").primaryKey(),
+  organization_id: text("organization_id").notNull(),
+  source_repository_id: text("source_repository_id").notNull(),
+  package_name: text("package_name").notNull(),
+  package_version: text("package_version").notNull(),
+  /** npm | go | pip | cargo | unknown */
+  ecosystem: text("ecosystem").notNull(),
+  /** Set when the package is also a tracked repository in this org */
+  dependent_repository_id: text("dependent_repository_id"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+

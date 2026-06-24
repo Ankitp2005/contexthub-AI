@@ -28,6 +28,8 @@ import {
   getPrompt,
   getImplicitOwnership,
   GetImplicitOwnershipInputSchema,
+  getBlastRadius,
+  GetBlastRadiusInputSchema,
 } from "@/domains/mcp/services";
 import { db } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
@@ -299,6 +301,17 @@ export async function POST(request: NextRequest) {
                     },
                     required: ["repositoryId", "filePath"]
                   }
+                },
+                {
+                  name: "get_blast_radius",
+                  description: "Compute the transitive blast radius for a repository — which other repos depend on it directly or transitively. Based on dependency graph (package.json, go.mod, etc).",
+                  inputSchema: {
+                    type: "object",
+                    properties: {
+                      repositoryId: { type: "string" }
+                    },
+                    required: ["repositoryId"]
+                  }
                 }
               ]
             }
@@ -387,6 +400,24 @@ export async function POST(request: NextRequest) {
               }, { status: 403 });
             }
             const result = await getImplicitOwnership(parsed.data);
+            return NextResponse.json({ jsonrpc, id, result });
+          } else if (name === "get_blast_radius") {
+            const parsed = GetBlastRadiusInputSchema.safeParse(args);
+            if (!parsed.success) {
+              return NextResponse.json({
+                jsonrpc,
+                id,
+                error: { code: -32602, message: "Invalid input", data: parsed.error.flatten() }
+              }, { status: 400 });
+            }
+            if (!(await verifyRepositoryOwnership(parsed.data.repositoryId, organizationId))) {
+              return NextResponse.json({
+                jsonrpc,
+                id,
+                error: { code: 403, message: "Forbidden: Repository does not belong to your organization" }
+              }, { status: 403 });
+            }
+            const result = await getBlastRadius(parsed.data, organizationId);
             return NextResponse.json({ jsonrpc, id, result });
           } else {
             return NextResponse.json({
@@ -545,9 +576,27 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(result);
         }
 
+        case "get_blast_radius": {
+          const parsed = GetBlastRadiusInputSchema.safeParse(input);
+          if (!parsed.success) {
+            return NextResponse.json(
+              { error: "Invalid input", details: parsed.error.flatten() },
+              { status: 400 }
+            );
+          }
+          if (!(await verifyRepositoryOwnership(parsed.data.repositoryId, organizationId))) {
+            return NextResponse.json(
+              { error: "Forbidden: Repository does not belong to your organization" },
+              { status: 403 }
+            );
+          }
+          const result = await getBlastRadius(parsed.data, organizationId);
+          return NextResponse.json(result);
+        }
+
         default:
           return NextResponse.json(
-            { error: `Unknown tool: ${tool}. Valid tools: score_change, get_ownership, get_constraints, get_implicit_ownership` },
+            { error: `Unknown tool: ${tool}. Valid tools: score_change, get_ownership, get_constraints, get_implicit_ownership, get_blast_radius` },
             { status: 400 }
           );
       }

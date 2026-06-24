@@ -37,4 +37,13 @@ export type {
   GetImplicitOwnershipResult,
   ImplicitOwnerEntry,
 } from "./implicit-ownership";
+export {
+  getBlastRadius,
+  GetBlastRadiusInputSchema,
+} from "./blast-radius";
+export type {
+  GetBlastRadiusInput,
+  BlastRadiusResult,
+} from "./blast-radius";
+
 

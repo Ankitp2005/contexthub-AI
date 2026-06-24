@@ -6,12 +6,14 @@ import { updateRepositorySyncState } from "@/domains/github/repositories";
 import { getInstallationAccessToken } from "@/domains/github/services";
 import { listRepositoryPullRequests, listPullRequestFiles } from "@/domains/github/services/pull-requests";
 import { fetchRepositoryCommitStats } from "@/domains/github/services/commits";
+import { fetchRepositoryDependencies } from "@/domains/github/services/dependencies";
 import { upsertPullRequest, clearPullRequestFiles, storePullRequestFiles } from "@/domains/github/repositories/pull-requests";
 import { runRiskPipeline } from "@/domains/risk/services/pipeline";
 import { parseCodeownersFile } from "@/domains/ownership/services";
 import { syncOwnershipRules } from "@/domains/ownership/repositories";
 import { computeOwnershipScores } from "@/domains/ownership/services/confidence";
 import { syncCommitActivity, getCommitActivity, syncImplicitOwnership } from "@/domains/ownership/repositories/commit-activity";
+import { syncDependencyEdges } from "@/domains/engineering/repositories";
 
 // CODEOWNERS fetching via GitHub Contents API
 async function fetchCodeOwners(
@@ -110,7 +112,13 @@ export const scanRepository = inngest.createFunction(
         await syncOwnershipRules(repositoryId, rules);
       });
 
-      // 5. Sync commit activity + compute implicit ownership
+      // 5. Sync dependency manifest (package.json / go.mod / etc.)
+      await step.run("sync-dependencies", async () => {
+        const edges = await fetchRepositoryDependencies(token, owner, repoName);
+        await syncDependencyEdges(organizationId, repositoryId, edges);
+      });
+
+      // 6. Sync commit activity + compute implicit ownership
       await step.run("sync-commit-activity", async () => {
         const stats = await fetchRepositoryCommitStats(token, owner, repoName, 100);
         await syncCommitActivity(repositoryId, stats);
