@@ -103,6 +103,9 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("[github/callback] Installation error:", error);
+    if (error && typeof error === "object" && "cause" in error) {
+      console.error("[github/callback] Root cause:", error.cause);
+    }
     return NextResponse.redirect(
       new URL("/dashboard?error=installation_failed", request.url)
     );
