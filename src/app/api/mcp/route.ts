@@ -109,8 +109,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Parse body
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let body: any;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -121,12 +120,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 });
   }
 
+  // After the null-object guard, body is a non-null object. Cast to a record
+  // so downstream code can safely access properties without any.
+  const bodyRecord = body as Record<string, unknown>;
+
   // ---------------------------------------------------------------------------
   // Protocol Type A: Standard JSON-RPC 2.0
   // ---------------------------------------------------------------------------
-  if ("method" in body) {
-    const { method, params, id } = body;
-    const jsonrpc = body.jsonrpc || "2.0";
+  if ("method" in bodyRecord) {
+    const method = bodyRecord.method;
+    const params = bodyRecord.params as Record<string, unknown> | undefined;
+    const id = bodyRecord.id;
+    const jsonrpc = (bodyRecord.jsonrpc as string | undefined) ?? "2.0";
 
     try {
       switch (method) {
@@ -472,8 +477,8 @@ export async function POST(request: NextRequest) {
   // ---------------------------------------------------------------------------
   // Protocol Type B: Custom Simplified Resource Query
   // ---------------------------------------------------------------------------
-  if ("resource" in body || "uri" in body) {
-    const uri = body.resource || body.uri;
+  if ("resource" in bodyRecord || "uri" in bodyRecord) {
+    const uri = bodyRecord.resource ?? bodyRecord.uri;
     if (typeof uri !== "string") {
       return NextResponse.json({ error: "resource or uri field must be a string" }, { status: 400 });
     }
@@ -502,8 +507,8 @@ export async function POST(request: NextRequest) {
   // ---------------------------------------------------------------------------
   // Protocol Type D: Custom Simplified Prompt Query
   // ---------------------------------------------------------------------------
-  if ("prompt" in body) {
-    const name = body.prompt;
+  if ("prompt" in bodyRecord) {
+    const name = bodyRecord.prompt;
     if (typeof name !== "string") {
       return NextResponse.json({ error: "prompt field must be a string" }, { status: 400 });
     }
@@ -523,8 +528,9 @@ export async function POST(request: NextRequest) {
   // ---------------------------------------------------------------------------
   // Protocol Type C: Custom Simplified Tool Call (Original Format)
   // ---------------------------------------------------------------------------
-  if ("tool" in body && "input" in body) {
-    const { tool, input } = body as { tool: string; input: unknown };
+  if ("tool" in bodyRecord && "input" in bodyRecord) {
+    const tool = bodyRecord.tool as string;
+    const input = bodyRecord.input;
 
     try {
       switch (tool) {

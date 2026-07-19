@@ -9,7 +9,7 @@
 //   7. Send Slack alert if score >= threshold (slack.ts)
 
 import type { GitHubPRFile } from "@/domains/github/types";
-import { scoreRisk } from "./engine";
+import { scoreRisk, isCriticalPath, isSensitiveDataPath } from "./engine";
 import { explainRiskAssessment } from "./explainer";
 import { sendSlackAlert } from "./slack";
 import { publishRiskComment } from "@/domains/github/services/pr-comment";
@@ -21,7 +21,7 @@ import {
 } from "@/domains/risk/repositories";
 import type { RiskInput } from "../types";
 import { db } from "@/lib/db";
-import { pull_requests, repositories } from "@/lib/db/schema";
+import { pull_requests, repositories, dependency_graph } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { parseCodeownersFile } from "@/domains/ownership/services";
 import { syncOwnershipRules } from "@/domains/ownership/repositories";
@@ -29,24 +29,8 @@ import { getConstraintsForOrganization } from "@/domains/constraints/repositorie
 import { getRecentIncidentServicesForOrganization } from "@/domains/incidents/repositories";
 
 // ---------------------------------------------------------------------------
-// Critical path keyword detection
-// Matches file paths that touch sensitive parts of the codebase.
+// Critical path matching uses shared engine helpers.
 // ---------------------------------------------------------------------------
-
-const CRITICAL_PATH_KEYWORDS = [
-  "payment", "billing", "invoice", "stripe", "checkout",
-  "auth", "oauth", "token", "session", "jwt", "password", "credential", "login",
-  "pii", "gdpr", "privacy", "personal_data",
-  "legacy", "deprecated",
-  "security", "crypto", "encrypt", "secret",
-  "admin", "superuser", "root",
-  "database", "migration", "schema",
-];
-
-function isCriticalPath(filePath: string): boolean {
-  const lower = filePath.toLowerCase();
-  return CRITICAL_PATH_KEYWORDS.some((keyword) => lower.includes(keyword));
-}
 
 // ---------------------------------------------------------------------------
 // CODEOWNERS parsing
@@ -190,6 +174,11 @@ function buildRiskInput(
     isCriticalPath(f.filename)
   ).length;
 
+  // Sensitive data exposure: check if any file touches sensitive data keywords
+  const sensitiveDataExposure = files.some((f) =>
+    isSensitiveDataPath(f.filename)
+  );
+
   // Ownership mismatch via CODEOWNERS
   let ownershipMismatch = false;
   if (codeownersContent) {
@@ -213,6 +202,7 @@ function buildRiskInput(
     changedFiles,
     changedLines,
     directDependentCount,
+    sensitiveDataExposure,
   };
 }
 
@@ -270,6 +260,7 @@ export async function runRiskPipeline(
     const prRecord = prRows[0];
     let databaseConstraintActive = false;
     let hasRecentIncident = false;
+    let directDependentCount = 0;
 
     if (prRecord) {
       const repositoryId = prRecord.repository_id;
@@ -278,6 +269,13 @@ export async function runRiskPipeline(
       console.log(
         `[Risk Pipeline] 💾 Synced ${rules.length} CODEOWNERS rules to DB for repository ${repositoryId}`
       );
+
+      // Evaluate direct dependents count
+      const depRows = await db
+        .select()
+        .from(dependency_graph)
+        .where(eq(dependency_graph.dependent_repository_id, repositoryId));
+      directDependentCount = depRows.length;
 
       // Evaluate database deployment constraints
       const repoRows = await db
@@ -329,7 +327,8 @@ export async function runRiskPipeline(
       prAuthor,
       codeownersContent,
       deploymentConstraintActive,
-      hasRecentIncident
+      hasRecentIncident,
+      directDependentCount
     );
     console.log(`[Risk Pipeline] Input:`, JSON.stringify(riskInput));
 

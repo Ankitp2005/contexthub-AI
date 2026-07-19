@@ -126,6 +126,8 @@ test("buildRiskInputFromContext maps files count correctly", () => {
     diff: "",
     ownershipRows: [],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   });
   assert.strictEqual(riskInput.changedFiles, 3);
 });
@@ -136,6 +138,8 @@ test("buildRiskInputFromContext maps diff line count correctly", () => {
     diff: "+added\n-removed\n unchanged",
     ownershipRows: [],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   });
   assert.strictEqual(riskInput.changedLines, 2);
 });
@@ -146,6 +150,8 @@ test("buildRiskInputFromContext sets ownershipMismatch from ownership rows", () 
     diff: "+change",
     ownershipRows: [{ path_pattern: "/src/payments" }],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   });
   assert.strictEqual(withRules.ownershipMismatch, true);
 
@@ -154,6 +160,8 @@ test("buildRiskInputFromContext sets ownershipMismatch from ownership rows", () 
     diff: "+change",
     ownershipRows: [],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   });
   assert.strictEqual(withoutRules.ownershipMismatch, false);
 });
@@ -164,6 +172,8 @@ test("buildRiskInputFromContext sets deploymentConstraintActive from hasDeployme
     diff: "",
     ownershipRows: [],
     hasDeploymentConstraints: true,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   });
   assert.strictEqual(active.deploymentConstraintActive, true);
 
@@ -172,19 +182,59 @@ test("buildRiskInputFromContext sets deploymentConstraintActive from hasDeployme
     diff: "",
     ownershipRows: [],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   });
   assert.strictEqual(inactive.deploymentConstraintActive, false);
 });
 
-test("buildRiskInputFromContext sets MCP v1 defaults for criticalPathCount and hasRecentIncident", () => {
+test("buildRiskInputFromContext computes criticalPathCount and hasRecentIncident dynamically", () => {
+  // Non-critical file → criticalPathCount = 0
   const riskInput = buildRiskInputFromContext({
-    files: ["a.ts"],
+    files: ["src/readme.md"],
     diff: "",
     ownershipRows: [],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   });
   assert.strictEqual(riskInput.criticalPathCount, 0);
   assert.strictEqual(riskInput.hasRecentIncident, false);
+});
+
+test("buildRiskInputFromContext detects critical path files correctly", () => {
+  const riskInput = buildRiskInputFromContext({
+    files: ["src/auth/login.ts", "src/readme.md"],
+    diff: "+change",
+    ownershipRows: [],
+    hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
+  });
+  // "auth" keyword → criticalPathCount = 1
+  assert.strictEqual(riskInput.criticalPathCount, 1);
+});
+
+test("buildRiskInputFromContext detects sensitiveDataExposure correctly", () => {
+  const withSensitive = buildRiskInputFromContext({
+    files: ["src/gdpr/user-data.ts"],
+    diff: "+change",
+    ownershipRows: [],
+    hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
+  });
+  assert.strictEqual(withSensitive.sensitiveDataExposure, true);
+
+  const withoutSensitive = buildRiskInputFromContext({
+    files: ["src/api/route.ts"],
+    diff: "+change",
+    ownershipRows: [],
+    hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
+  });
+  assert.strictEqual(withoutSensitive.sensitiveDataExposure, false);
 });
 
 // ---------------------------------------------------------------------------
@@ -201,6 +251,8 @@ test("SAME-SCORE: baseline (no risks) — tool matches direct engine call", () =
     diff: "+updated text",
     ownershipRows: [] as { path_pattern: string }[],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   };
 
   const derivedInput = buildRiskInputFromContext(ctx);
@@ -214,6 +266,7 @@ test("SAME-SCORE: baseline (no risks) — tool matches direct engine call", () =
     hasRecentIncident: false,
     changedFiles: 1,
     changedLines: 1,
+    sensitiveDataExposure: false,
   });
 
   assert.strictEqual(toolScore.score, dashboardScore.score);
@@ -227,21 +280,26 @@ test("SAME-SCORE: ownership mismatch (+3) — tool matches direct engine call", 
     diff: "+const x = 1;",
     ownershipRows: [{ path_pattern: "/src/payments" }],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   };
 
   const toolScore = scoreRisk(buildRiskInputFromContext(ctx));
+  // "payment" in filename → isCriticalPath=true → criticalPathCount=1 → CriticalService(+4)
+  // BASE(1) + OwnershipMismatch(3) + CriticalService(4) = 8
   const dashboardScore = scoreRisk({
     ownershipMismatch: true,
-    criticalPathCount: 0,
+    criticalPathCount: 1,
     deploymentConstraintActive: false,
     hasRecentIncident: false,
     changedFiles: 1,
     changedLines: 1,
+    sensitiveDataExposure: false,
   });
 
   assert.strictEqual(toolScore.score, dashboardScore.score);
-  assert.strictEqual(toolScore.score, 4); // BASE(1) + OwnershipMismatch(3)
-  assert.strictEqual(toolScore.level, "MEDIUM");
+  assert.strictEqual(toolScore.score, 8); // BASE(1) + OwnershipMismatch(3) + CriticalService(4)
+  assert.strictEqual(toolScore.level, "HIGH"); // score <= 8 → HIGH
 });
 
 test("SAME-SCORE: deployment constraint active (+3) — tool matches direct engine call", () => {
@@ -250,6 +308,8 @@ test("SAME-SCORE: deployment constraint active (+3) — tool matches direct engi
     diff: "+const x = 1;",
     ownershipRows: [] as { path_pattern: string }[],
     hasDeploymentConstraints: true,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   };
 
   const toolScore = scoreRisk(buildRiskInputFromContext(ctx));
@@ -260,6 +320,7 @@ test("SAME-SCORE: deployment constraint active (+3) — tool matches direct engi
     hasRecentIncident: false,
     changedFiles: 1,
     changedLines: 1,
+    sensitiveDataExposure: false,
   });
 
   assert.strictEqual(toolScore.score, dashboardScore.score);
@@ -275,6 +336,8 @@ test("SAME-SCORE: large change set (>25 files, +1) — tool matches direct engin
     diff: "+change",
     ownershipRows: [] as { path_pattern: string }[],
     hasDeploymentConstraints: false,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   };
 
   const toolScore = scoreRisk(buildRiskInputFromContext(ctx));
@@ -285,6 +348,7 @@ test("SAME-SCORE: large change set (>25 files, +1) — tool matches direct engin
     hasRecentIncident: false,
     changedFiles: 26,
     changedLines: 1,
+    sensitiveDataExposure: false,
   });
 
   assert.strictEqual(toolScore.score, dashboardScore.score);
@@ -297,19 +361,25 @@ test("SAME-SCORE: ownership + deployment constraint — tool matches direct engi
     diff: "+change",
     ownershipRows: [{ path_pattern: "/src/payments" }],
     hasDeploymentConstraints: true,
+    hasRecentIncident: false,
+    directDependentCount: 0,
   };
 
   const toolScore = scoreRisk(buildRiskInputFromContext(ctx));
+  // "payment" in filename → isCriticalPath=true → criticalPathCount=1 → CriticalService(+4)
+  // BASE(1) + OwnershipMismatch(3) + DeploymentFreeze(3) + CriticalService(4) = 11 → clamped to 10
+  // Also triggers Override 1: CriticalService + DeploymentFreeze → min 9
   const dashboardScore = scoreRisk({
     ownershipMismatch: true,
-    criticalPathCount: 0,
+    criticalPathCount: 1,
     deploymentConstraintActive: true,
     hasRecentIncident: false,
     changedFiles: 1,
     changedLines: 1,
+    sensitiveDataExposure: false,
   });
 
   assert.strictEqual(toolScore.score, dashboardScore.score);
-  assert.strictEqual(toolScore.score, 7); // BASE(1) + Ownership(3) + Freeze(3)
-  assert.strictEqual(toolScore.level, "HIGH");
+  assert.strictEqual(toolScore.score, 10); // BASE(1) + Ownership(3) + Freeze(3) + CriticalService(4) → clamped
+  assert.strictEqual(toolScore.level, "CRITICAL");
 });

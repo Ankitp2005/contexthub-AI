@@ -24,6 +24,7 @@ const WEIGHT_EXCESSIVE_LOC = 1;           // triggered when changedLines > 500
 const WEIGHT_MULTIPLE_CRITICAL_SERVICES = 2; // triggered when criticalPathCount >= 2
 const WEIGHT_BLAST_RADIUS_PER_DEP = 1;    // +1 per direct dependent, capped at +3
 const WEIGHT_BLAST_RADIUS_MAX = 3;
+const WEIGHT_SENSITIVE_DATA_EXPOSURE = 3;
 
 const THRESHOLD_LARGE_CHANGE_SET = 25;
 const THRESHOLD_EXCESSIVE_LOC = 500;
@@ -34,6 +35,30 @@ const SCORE_MAX = 10;
 
 // Critical-override minimum scores (docs/risk-engine.md § Critical Overrides)
 const OVERRIDE_CRITICAL_AND_FREEZE_MIN = 9;
+const OVERRIDE_SENSITIVE_AND_OWNERSHIP_MIN = 8;
+
+const CRITICAL_PATH_KEYWORDS = [
+  "payment", "billing", "invoice", "stripe", "checkout",
+  "auth", "oauth", "token", "session", "jwt", "password", "credential", "login",
+  "legacy", "deprecated",
+  "security", "crypto", "encrypt", "secret",
+  "admin", "superuser", "root",
+  "database", "migration", "schema",
+];
+
+const SENSITIVE_DATA_KEYWORDS = [
+  "pii", "gdpr", "privacy", "personal_data", "hipaa", "pci"
+];
+
+export function isCriticalPath(filePath: string): boolean {
+  const lower = filePath.toLowerCase();
+  return CRITICAL_PATH_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
+
+export function isSensitiveDataPath(filePath: string): boolean {
+  const lower = filePath.toLowerCase();
+  return SENSITIVE_DATA_KEYWORDS.some((keyword) => lower.includes(keyword));
+}
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -167,6 +192,15 @@ export function generateRiskFactors(input: RiskInput): RiskFactor[] {
     });
   }
 
+  // 8. Sensitive Data Exposure Area (+3)
+  if (input.sensitiveDataExposure) {
+    factors.push({
+      name: "SensitiveDataExposure",
+      weight: WEIGHT_SENSITIVE_DATA_EXPOSURE,
+      reason: "PR modifies files associated with sensitive data (PII, GDPR, HIPAA, PCI).",
+    });
+  }
+
   return factors;
 }
 
@@ -217,6 +251,11 @@ export function scoreRisk(input: RiskInput): RiskAssessmentResult {
   // Override 1: CriticalService + DeploymentFreeze → minimum 9
   if (touchesCriticalService && input.deploymentConstraintActive) {
     overriddenScore = Math.max(overriddenScore, OVERRIDE_CRITICAL_AND_FREEZE_MIN);
+  }
+
+  // Override 2: SensitiveDataExposure + OwnershipMismatch → minimum 8
+  if (input.sensitiveDataExposure && input.ownershipMismatch) {
+    overriddenScore = Math.max(overriddenScore, OVERRIDE_SENSITIVE_AND_OWNERSHIP_MIN);
   }
 
   // -------------------------------------------------------------------------

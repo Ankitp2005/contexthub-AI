@@ -22,6 +22,7 @@ export const RiskInputSchema = z.object({
   changedLines: z.number().int().min(0),
   /** Number of direct downstream dependents — optional, defaults to 0 */
   directDependentCount: z.number().int().min(0).default(0),
+  sensitiveDataExposure: z.boolean(),
 });
 
 export type RiskInputSchemaType = z.infer<typeof RiskInputSchema>;

@@ -8,17 +8,19 @@
 //  - Only return domain DTOs — never raw DB records.
 //  - Exactly 3 tools: score_change, get_ownership, get_constraints.
 
-import { scoreRisk } from "../../risk/services/engine";
+import { scoreRisk, isCriticalPath, isSensitiveDataPath } from "../../risk/services/engine";
 import { explainRiskAssessment } from "../../risk/services/explainer";
 import type { RiskInput } from "../../risk/types";
 import { getFileOwnership } from "../../ownership/services";
 import { getApplicableConstraints } from "../../constraints/services";
 import { getConstraintsForOrganization } from "../../constraints/repositories";
+import { getRecentIncidentServicesForOrganization } from "../../incidents/repositories";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   ownership_rules,
   repositories,
+  dependency_graph,
 } from "@/lib/db/schema";
 import type {
   ScoreChangeResult,
@@ -89,21 +91,25 @@ export function buildRiskInputFromContext(ctx: {
   diff: string;
   ownershipRows: Array<{ path_pattern: string }>;
   hasDeploymentConstraints: boolean;
+  hasRecentIncident: boolean;
+  directDependentCount: number;
 }): RiskInput {
   return {
     ownershipMismatch: detectOwnershipMismatch(ctx.files, ctx.ownershipRows),
-    criticalPathCount: 0,        // MCP v1: inferred in a future phase
+    criticalPathCount: ctx.files.filter((f) => isCriticalPath(f)).length,
+    sensitiveDataExposure: ctx.files.some((f) => isSensitiveDataPath(f)),
     deploymentConstraintActive: ctx.hasDeploymentConstraints,
-    hasRecentIncident: false,    // MCP v1: inferred in a future phase
+    hasRecentIncident: ctx.hasRecentIncident,
     changedFiles: ctx.files.length,
     changedLines: countChangedLines(ctx.diff),
-    directDependentCount: 0,     // MCP v1: agents can call get_blast_radius for this
+    directDependentCount: ctx.directDependentCount,
   };
 }
 
 // ---------------------------------------------------------------------------
 // Tool 1: score_change
 // ---------------------------------------------------------------------------
+
 
 /**
  * scoreChange — Evaluates the risk of a proposed code change.
@@ -128,7 +134,7 @@ export async function scoreChange(
     .from(ownership_rules)
     .where(eq(ownership_rules.repository_id, repositoryId));
 
-  // Step 2 — Load deployment constraints via the owning organisation
+  // Step 2 — Load deployment constraints and org context via owning organisation
   const repoRows = await db
     .select()
     .from(repositories)
@@ -137,24 +143,43 @@ export async function scoreChange(
 
   const repo = repoRows[0];
   let hasDeploymentConstraints = false;
+  let hasRecentIncident = false;
+  let directDependentCount = 0;
 
   if (repo) {
+    // Deployment constraints
     const constraints = await getConstraintsForOrganization(repo.organization_id);
     hasDeploymentConstraints = constraints.length > 0;
+
+    // Step 3 — Check for recent incidents matching modified files
+    const recentIncidentServices = await getRecentIncidentServicesForOrganization(repo.organization_id);
+    hasRecentIncident = recentIncidentServices.some((serviceName) => {
+      const serviceNameLower = serviceName.toLowerCase();
+      return files.some((f) => f.toLowerCase().includes(serviceNameLower));
+    });
+
+    // Step 4 — Count direct downstream dependents of this repository
+    const depRows = await db
+      .select()
+      .from(dependency_graph)
+      .where(eq(dependency_graph.dependent_repository_id, repositoryId));
+    directDependentCount = depRows.length;
   }
 
-  // Step 3 — Construct RiskInput using the canonical pure helper
+  // Step 5 — Construct RiskInput using the canonical pure helper
   const riskInput = buildRiskInputFromContext({
     files,
     diff,
     ownershipRows,
     hasDeploymentConstraints,
+    hasRecentIncident,
+    directDependentCount,
   });
 
-  // Step 4 — Delegate to the risk engine (no scoring logic in MCP)
+  // Step 6 — Delegate to the risk engine (no scoring logic in MCP)
   const result = scoreRisk(riskInput);
 
-  // Step 5 — Generate human-readable summary (cannot change the score)
+  // Step 7 — Generate human-readable summary (cannot change the score)
   const explanation = await explainRiskAssessment({
     score: result.score,
     level: result.level,
@@ -168,6 +193,7 @@ export async function scoreChange(
     summary: explanation.summary,
   };
 }
+
 
 // ---------------------------------------------------------------------------
 // Tool 2: get_ownership

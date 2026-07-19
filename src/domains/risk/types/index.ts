@@ -34,6 +34,9 @@ export interface RiskInput {
    * @default 0
    */
   directDependentCount?: number;
+
+  /** True when the PR touches sensitive data (PII, GDPR, HIPAA, PCI). */
+  sensitiveDataExposure: boolean;
 }
 
 /**

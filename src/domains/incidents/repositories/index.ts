@@ -1,6 +1,7 @@
 import { eq, and, gte, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { incidents, incident_services } from "@/lib/db/schema";
+import { generateEmbedding } from "../services/embeddings";
 
 export interface StoredIncidentWithServices {
   id: string;
@@ -50,8 +51,19 @@ export async function createIncident(
   },
   services: string[]
 ) {
-  // Insert the main incident row
-  const [incident] = await db.insert(incidents).values(data).returning();
+  // Generate embedding vector for title + description
+  const vectorText = `${data.title}\n${data.description}`;
+  const description_vector = await generateEmbedding(vectorText);
+
+  // Insert the main incident row with vector embedding
+  const [incident] = await db
+    .insert(incidents)
+    .values({
+      ...data,
+      description_vector,
+    })
+    .returning();
+
   if (!incident) {
     throw new Error("Failed to insert incident");
   }

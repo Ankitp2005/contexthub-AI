@@ -114,10 +114,39 @@ Output Schema
     {
       "name": "OwnershipMismatch",
       "weight": 3
+    },
+    {
+      "name": "SensitiveDataExposure",
+      "weight": 3
     }
   ],
   "summary": "string"
 }
+
+---
+
+Risk Factors
+
+| Factor                    | Weight | Trigger                                             |
+|---------------------------|--------|-----------------------------------------------------|
+| OwnershipMismatch         | +3     | PR author not in CODEOWNERS for touched paths       |
+| CriticalService           | +4     | File path matches a critical-path keyword           |
+| MultipleCriticalServices  | +2     | 2+ critical-path files changed                      |
+| DeploymentFreeze          | +3     | Active deployment constraint                        |
+| RecentIncident            | +2     | Touched service had a recent incident               |
+| LargeChangeSet            | +1     | More than 25 files changed                          |
+| ExcessiveLOC              | +1     | More than 500 lines changed                         |
+| HighBlastRadius           | +1–3   | Direct downstream dependents (capped at 3)          |
+| SensitiveDataExposure     | +3     | File path matches PII/GDPR/HIPAA/PCI keywords       |
+
+---
+
+Critical Override Rules
+
+| Condition                                        | Floor |
+|--------------------------------------------------|-------|
+| CriticalService + DeploymentFreeze               | 9     |
+| SensitiveDataExposure + OwnershipMismatch        | 8     |
 
 ---
 

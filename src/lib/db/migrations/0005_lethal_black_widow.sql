@@ -1,0 +1,3 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+ALTER TABLE "incidents" ADD COLUMN "description_vector" vector(1536);
