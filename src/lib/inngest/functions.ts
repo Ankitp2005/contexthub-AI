@@ -58,6 +58,113 @@ async function fetchCodeOwners(
   return null;
 }
 
+export async function performDirectSync(repositoryId: string, organizationId: string) {
+  // 1. Fetch repository record
+  const repoRecord = await db
+    .select()
+    .from(repositories)
+    .where(eq(repositories.id, repositoryId))
+    .limit(1)
+    .then((r) => r[0] ?? null);
+
+  if (!repoRecord) {
+    throw new Error(`Repository ${repositoryId} not found in database`);
+  }
+
+  // 2. Fetch github installation record
+  const installation = await db
+    .select()
+    .from(github_installations)
+    .where(eq(github_installations.organization_id, organizationId))
+    .limit(1)
+    .then((r) => r[0] ?? null);
+
+  if (!installation) {
+    await updateRepositorySyncState(repositoryId, null, new Date());
+    throw new Error(`GitHub Installation not found for org ${organizationId}`);
+  }
+
+  const [owner, repoName] = repoRecord.full_name.split("/") as [string, string];
+
+  try {
+    // 3. Get installation token
+    const token = await getInstallationAccessToken(installation.github_installation_id);
+
+    // 4. Fetch latest CODEOWNERS file and sync rules
+    const codeownersContent = await fetchCodeOwners(token, owner, repoName);
+    const rules = codeownersContent ? parseCodeownersFile(codeownersContent) : [];
+    await syncOwnershipRules(repositoryId, rules);
+
+    // 5. Sync dependency manifest (package.json / go.mod / etc.)
+    const edges = await fetchRepositoryDependencies(token, owner, repoName);
+    await syncDependencyEdges(organizationId, repositoryId, edges);
+
+    // 6. Sync commit activity + compute implicit ownership
+    const stats = await fetchRepositoryCommitStats(token, owner, repoName, 100);
+    await syncCommitActivity(repositoryId, stats);
+
+    const activityRows = await getCommitActivity(repositoryId);
+    const scores = computeOwnershipScores(activityRows, 3);
+    await syncImplicitOwnership(repositoryId, scores);
+
+    // 6. Fetch recent/all Pull Requests (so we sync closed/merged PRs as well)
+    const pulls = await listRepositoryPullRequests(
+      installation.github_installation_id,
+      owner,
+      repoName,
+      "all"
+    );
+
+    // 6. Sync each Pull Request
+    for (const pr of pulls) {
+      // Upsert PR metadata
+      const prRecord = await upsertPullRequest({
+        id: crypto.randomUUID(),
+        repository_id: repoRecord.id,
+        github_pr_id: pr.id,
+        number: pr.number,
+        title: pr.title,
+        author: pr.user.login,
+        state: pr.state,
+      });
+
+      // Fetch changed files for this PR
+      const files = await listPullRequestFiles(
+        installation.github_installation_id,
+        owner,
+        repoName,
+        pr.number
+      );
+
+      // Clear & store files in DB
+      await clearPullRequestFiles(prRecord.id);
+      await storePullRequestFiles(prRecord.id, files);
+
+      // Run risk scoring pipeline for the PR
+      await runRiskPipeline({
+        installationId: installation.github_installation_id,
+        owner,
+        repo: repoName,
+        prNumber: pr.number,
+        prAuthor: pr.user.login,
+        prHtmlUrl: pr.html_url,
+        files,
+        pullRequestId: prRecord.id,
+        headSha: pr.head.sha,
+      });
+    }
+
+    // 7. Successful sync - release lock and update last_scanned_at
+    await updateRepositorySyncState(repositoryId, null, new Date());
+
+    return { success: true, prCount: pulls.length };
+  } catch (err) {
+    // Release lock on error
+    await updateRepositorySyncState(repositoryId, null, new Date());
+    throw err;
+  }
+}
+
 export const scanRepository = inngest.createFunction(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   { id: "scan-repository", triggers: [{ event: "repository.scan" }] } as any,
@@ -65,135 +172,14 @@ export const scanRepository = inngest.createFunction(
   async ({ event, step }: any) => {
     const { repositoryId, organizationId } = event.data;
 
-    // 1. Fetch repository record
-    const repoRecord = await step.run("fetch-repo-db", async () => {
-      const results = await db
-        .select()
-        .from(repositories)
-        .where(eq(repositories.id, repositoryId))
-        .limit(1);
-      return results[0] ?? null;
-    });
-
-    if (!repoRecord) {
-      throw new Error(`Repository ${repositoryId} not found in database`);
-    }
-
-    // 2. Fetch github installation record
-    const installation = await step.run("fetch-installation-db", async () => {
-      const results = await db
-        .select()
-        .from(github_installations)
-        .where(eq(github_installations.organization_id, organizationId))
-        .limit(1);
-      return results[0] ?? null;
-    });
-
-    if (!installation) {
-      await updateRepositorySyncState(repositoryId, null, new Date());
-      throw new Error(`GitHub Installation not found for org ${organizationId}`);
-    }
-
-    const [owner, repoName] = repoRecord.full_name.split("/") as [string, string];
-
     try {
-      // 3. Get installation token
-      const token = await step.run("get-github-token", async () => {
-        return getInstallationAccessToken(installation.github_installation_id);
+      const result = await step.run("run-direct-sync", async () => {
+        return performDirectSync(repositoryId, organizationId);
       });
-
-      // 4. Fetch latest CODEOWNERS file and sync rules
-      const codeownersContent = await step.run("fetch-codeowners", async () => {
-        return fetchCodeOwners(token, owner, repoName);
-      });
-
-      await step.run("sync-codeowners-rules", async () => {
-        const rules = codeownersContent ? parseCodeownersFile(codeownersContent) : [];
-        await syncOwnershipRules(repositoryId, rules);
-      });
-
-      // 5. Sync dependency manifest (package.json / go.mod / etc.)
-      await step.run("sync-dependencies", async () => {
-        const edges = await fetchRepositoryDependencies(token, owner, repoName);
-        await syncDependencyEdges(organizationId, repositoryId, edges);
-      });
-
-      // 6. Sync commit activity + compute implicit ownership
-      await step.run("sync-commit-activity", async () => {
-        const stats = await fetchRepositoryCommitStats(token, owner, repoName, 100);
-        await syncCommitActivity(repositoryId, stats);
-      });
-
-      await step.run("compute-implicit-ownership", async () => {
-        const activityRows = await getCommitActivity(repositoryId);
-        const scores = computeOwnershipScores(activityRows, 3);
-        await syncImplicitOwnership(repositoryId, scores);
-      });
-
-      // 6. Fetch recent/open Pull Requests
-      const pulls = await step.run("fetch-open-prs", async () => {
-        return listRepositoryPullRequests(
-          installation.github_installation_id,
-          owner,
-          repoName,
-          "open"
-        );
-      });
-
-      // 6. Sync each Pull Request
-      for (const pr of pulls) {
-        await step.run(`sync-pr-${pr.number}`, async () => {
-          // Upsert PR metadata
-          const prRecord = await upsertPullRequest({
-            id: crypto.randomUUID(),
-            repository_id: repoRecord.id,
-            github_pr_id: pr.id,
-            number: pr.number,
-            title: pr.title,
-            author: pr.user.login,
-            state: pr.state,
-          });
-
-          // Fetch changed files for this PR
-          const files = await listPullRequestFiles(
-            installation.github_installation_id,
-            owner,
-            repoName,
-            pr.number
-          );
-
-          // Clear & store files in DB
-          await clearPullRequestFiles(prRecord.id);
-          await storePullRequestFiles(prRecord.id, files);
-
-          // Run risk scoring pipeline for the PR
-          await runRiskPipeline({
-            installationId: installation.github_installation_id,
-            owner,
-            repo: repoName,
-            prNumber: pr.number,
-            prAuthor: pr.user.login,
-            prHtmlUrl: pr.html_url,
-            files,
-            pullRequestId: prRecord.id,
-            headSha: pr.head.sha,
-          });
-        });
-      }
-
-      // 7. Successful sync - release lock and update last_scanned_at
-      await step.run("release-lock-success", async () => {
-        await updateRepositorySyncState(repositoryId, null, new Date());
-      });
-
-      return { success: true, prCount: pulls.length };
+      return result;
     } catch (err) {
-      // Release lock on error
-      await step.run("release-lock-error", async () => {
-        await updateRepositorySyncState(repositoryId, null, new Date());
-      });
       const errMsg = err instanceof Error ? err.message : String(err);
-      throw new Error(`Scan failed for repository ${repoRecord.full_name}: ${errMsg}`);
+      throw new Error(`Scan failed: ${errMsg}`);
     }
   }
 );

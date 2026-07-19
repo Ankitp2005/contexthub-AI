@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { listRepositoriesByOrganization, updateRepositorySyncState } from "@/domains/github/repositories";
 import { inngest } from "@/lib/inngest/client";
+import { performDirectSync } from "@/lib/inngest/functions";
 
 export async function POST(request: NextRequest) {
   let userId: string | null = null;
@@ -37,14 +38,27 @@ export async function POST(request: NextRequest) {
         // Set syncing lock state
         await updateRepositorySyncState(repo.id, new Date());
         
-        // Dispatch inngest background job
-        await inngest.send({
-          name: "repository.scan",
-          data: {
-            repositoryId: repo.id,
-            organizationId: userId,
-          },
-        });
+        try {
+          // Attempt to dispatch via Inngest background job
+          await inngest.send({
+            name: "repository.scan",
+            data: {
+              repositoryId: repo.id,
+              organizationId: userId,
+            },
+          });
+          console.log(`[Scan API] Dispatched scan event to Inngest for repo ${repo.full_name}`);
+        } catch (inngestError) {
+          console.warn(
+            `[Scan API] Inngest dispatch failed for ${repo.full_name}, falling back to direct background sync:`,
+            inngestError
+          );
+          // Fallback to inline background processing so the API call doesn't throw a 500 error
+          void performDirectSync(repo.id, userId).catch((err) => {
+            console.error(`[Scan API] Direct background sync failed for ${repo.full_name}:`, err);
+          });
+        }
+        
         scanTriggers.push(repo.full_name);
       }
     }
