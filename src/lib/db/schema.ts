@@ -5,6 +5,7 @@ import {
   timestamp,
   numeric,
   customType,
+  bigint,
 } from "drizzle-orm/pg-core";
 
 // pgvector custom type for 1536-dimensional vectors
@@ -49,7 +50,7 @@ export const users = pgTable("users", {
 export const github_installations = pgTable("github_installations", {
   id: text("id").primaryKey(),
   organization_id: text("organization_id").notNull(),
-  github_installation_id: integer("github_installation_id").notNull(),
+  github_installation_id: bigint("github_installation_id", { mode: "number" }).notNull(),
   account_name: text("account_name").notNull(),
   created_at: timestamp("created_at").notNull().defaultNow(),
 });
@@ -58,7 +59,7 @@ export const github_installations = pgTable("github_installations", {
 export const repositories = pgTable("repositories", {
   id: text("id").primaryKey(),
   organization_id: text("organization_id").notNull(),
-  github_repo_id: integer("github_repo_id").notNull(),
+  github_repo_id: bigint("github_repo_id", { mode: "number" }).notNull(),
   name: text("name").notNull(),
   full_name: text("full_name").notNull(),
   default_branch: text("default_branch").notNull(),
@@ -73,7 +74,7 @@ export const repositories = pgTable("repositories", {
 export const pull_requests = pgTable("pull_requests", {
   id: text("id").primaryKey(),
   repository_id: text("repository_id").notNull(),
-  github_pr_id: integer("github_pr_id").notNull(),
+  github_pr_id: bigint("github_pr_id", { mode: "number" }).notNull(),
   number: integer("number").notNull(),
   title: text("title").notNull(),
   author: text("author").notNull(),
