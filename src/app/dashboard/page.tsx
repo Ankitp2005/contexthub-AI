@@ -22,7 +22,6 @@ export default async function DashboardPage() {
     redirect("/sign-in");
   }
 
-  // Fetch user profile info, repositories, pull requests, constraints, incidents, and installation
   const [user, repos, prs, constraints, incidentsList, installation] = await Promise.all([
     currentUser(),
     listRepositoriesByOrganization(userId),
@@ -37,7 +36,6 @@ export default async function DashboardPage() {
     ? `https://github.com/settings/installations/${installation.github_installation_id}`
     : `https://github.com/apps/${githubAppSlug}/installations/new`;
 
-
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? "admin@acme.io";
   const userInitials =
     user?.firstName && user?.lastName
@@ -47,31 +45,16 @@ export default async function DashboardPage() {
       : "U";
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#080808] text-[#e8e4dc]">
-      <header className="flex items-center justify-between border-b border-[#1e1e1e] bg-[#0f0f0f] px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center bg-[#e8c547] text-black font-bold text-sm">
-            C
-          </div>
-          <h1 className="text-lg font-bold text-[#e8e4dc] font-sans tracking-wide">
-            ContextHub AI
-          </h1>
-        </div>
-        <UserButton />
-      </header>
-
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <DashboardClient
-          repos={repos}
-          prs={prs}
-          constraints={constraints}
-          incidents={incidentsList}
-          installUrl={installUrl}
-          userEmail={userEmail}
-          userInitials={userInitials}
-        />
-      </main>
-    </div>
+    <DashboardClient
+      repos={repos}
+      prs={prs}
+      constraints={constraints}
+      incidents={incidentsList}
+      installUrl={installUrl}
+      userEmail={userEmail}
+      userInitials={userInitials}
+    />
   );
 }
+
 
