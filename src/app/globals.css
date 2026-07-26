@@ -49,8 +49,8 @@
 }
 
 :root {
-  --background: #080808;
-  --foreground: #e8e4dc;
+  --background: #F2F2F7;
+  --foreground: #1C1C1E;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -123,6 +123,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  html, body, #__next {
+    height: 100%;
+    width: 100%;
   }
   html {
     @apply font-sans;
