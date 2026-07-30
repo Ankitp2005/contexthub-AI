@@ -26,7 +26,7 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the dashboard.
+Open [/contexthub-ai.vercel.app](/contexthub-ai.vercel.app) with your browser to see the dashboard.
 
 ## Learn More
 
