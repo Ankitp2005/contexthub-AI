@@ -101,6 +101,39 @@ export async function storePullRequestFiles(
   return db.insert(pull_request_files).values(values).returning();
 }
 
+/**
+ * Atomically replaces all files for a pull request in a single transaction.
+ * Prevents race conditions when concurrent webhooks fire for the same PR.
+ */
+export async function replacePullRequestFiles(
+  pullRequestId: string,
+  files: Array<{
+    filename: string;
+    status: string;
+    additions: number;
+    deletions: number;
+  }>
+) {
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(pull_request_files)
+      .where(eq(pull_request_files.pull_request_id, pullRequestId));
+
+    if (files.length === 0) return;
+
+    const values = files.map((file) => ({
+      id: crypto.randomUUID(),
+      pull_request_id: pullRequestId,
+      file_path: file.filename,
+      change_type: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+    }));
+
+    await tx.insert(pull_request_files).values(values);
+  });
+}
+
 export async function listPullRequestsWithAssessmentsForOrganization(
   organizationId: string
 ) {

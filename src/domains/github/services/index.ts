@@ -4,9 +4,9 @@ import { createSign } from "node:crypto";
 import type {
   GitHubAccessTokenResponse,
   GitHubInstallation,
-  GitHubInstallationRepositoriesResponse,
   GitHubRepository,
 } from "../types";
+import { fetchPaginatedField } from "./pagination";
 
 const GITHUB_API_BASE = "https://api.github.com";
 const GITHUB_API_VERSION = "2022-11-28";
@@ -130,20 +130,11 @@ export async function listInstallationRepositories(
 ): Promise<GitHubRepository[]> {
   const token = await getInstallationAccessToken(installationId);
 
-  const response = await fetch(
-    `${GITHUB_API_BASE}/installation/repositories?per_page=100`,
-    { headers: githubHeaders(token, "bearer") }
+  return fetchPaginatedField<GitHubRepository>(
+    `${GITHUB_API_BASE}/installation/repositories`,
+    githubHeaders(token, "bearer"),
+    "repositories",
   );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to list repositories: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data =
-    (await response.json()) as GitHubInstallationRepositoriesResponse;
-  return data.repositories;
 }
 
 export * from "./pr-comment";

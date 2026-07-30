@@ -7,7 +7,7 @@ import { getInstallationAccessToken } from "@/domains/github/services";
 import { listRepositoryPullRequests, listPullRequestFiles } from "@/domains/github/services/pull-requests";
 import { fetchRepositoryCommitStats } from "@/domains/github/services/commits";
 import { fetchRepositoryDependencies } from "@/domains/github/services/dependencies";
-import { upsertPullRequest, clearPullRequestFiles, storePullRequestFiles } from "@/domains/github/repositories/pull-requests";
+import { upsertPullRequest, replacePullRequestFiles } from "@/domains/github/repositories/pull-requests";
 import { runRiskPipeline } from "@/domains/risk/services/pipeline";
 import { parseCodeownersFile } from "@/domains/ownership/services";
 import { syncOwnershipRules } from "@/domains/ownership/repositories";
@@ -80,7 +80,7 @@ export async function performDirectSync(repositoryId: string, organizationId: st
     .then((r) => r[0] ?? null);
 
   if (!installation) {
-    await updateRepositorySyncState(repositoryId, null, new Date());
+    await updateRepositorySyncState(repositoryId, null, new Date(), organizationId);
     throw new Error(`GitHub Installation not found for org ${organizationId}`);
   }
 
@@ -136,9 +136,8 @@ export async function performDirectSync(repositoryId: string, organizationId: st
         pr.number
       );
 
-      // Clear & store files in DB
-      await clearPullRequestFiles(prRecord.id);
-      await storePullRequestFiles(prRecord.id, files);
+      // Atomically replace files in a transaction
+      await replacePullRequestFiles(prRecord.id, files);
 
       // Run risk scoring pipeline for the PR
       await runRiskPipeline({
@@ -155,12 +154,12 @@ export async function performDirectSync(repositoryId: string, organizationId: st
     }
 
     // 7. Successful sync - release lock and update last_scanned_at
-    await updateRepositorySyncState(repositoryId, null, new Date());
+    await updateRepositorySyncState(repositoryId, null, new Date(), organizationId);
 
     return { success: true, prCount: pulls.length };
   } catch (err) {
     // Release lock on error
-    await updateRepositorySyncState(repositoryId, null, new Date());
+    await updateRepositorySyncState(repositoryId, null, new Date(), organizationId);
     throw err;
   }
 }

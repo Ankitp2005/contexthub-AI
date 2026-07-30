@@ -39,7 +39,7 @@ export async function handleInstallationRepositoriesEvent(
 
   if (payload.repositories_removed && payload.repositories_removed.length > 0) {
     for (const repo of payload.repositories_removed) {
-      await deleteRepositoryByGitHubId(repo.id);
+      await deleteRepositoryByGitHubId(repo.id, orgId);
       console.log(`[GitHub Webhook] Removed repository ${repo.full_name}`);
     }
   }
@@ -47,7 +47,8 @@ export async function handleInstallationRepositoriesEvent(
 
 export async function handleInstallationEvent(payload: GitHubInstallationEvent) {
   if (payload.action === "deleted") {
-    await deleteInstallationByGitHubId(payload.installation.id);
+    const installation = await findInstallationByGitHubId(payload.installation.id);
+    await deleteInstallationByGitHubId(payload.installation.id, installation?.organization_id);
     console.log(`[GitHub Webhook] Deleted installation ${payload.installation.id}`);
   }
 }

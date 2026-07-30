@@ -1,6 +1,6 @@
 // github domain — repositories (data access layer)
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   github_installations,
@@ -132,23 +132,36 @@ export async function listRepositoriesByOrganization(organizationId: string) {
     .where(eq(repositories.organization_id, organizationId));
 }
 
-export async function deleteRepositoryByGitHubId(githubRepoId: number) {
+export async function deleteRepositoryByGitHubId(githubRepoId: number, organizationId?: string) {
+  const conditions = [eq(repositories.github_repo_id, githubRepoId)];
+  if (organizationId) {
+    conditions.push(eq(repositories.organization_id, organizationId));
+  }
   return db
     .delete(repositories)
-    .where(eq(repositories.github_repo_id, githubRepoId));
+    .where(and(...conditions));
 }
 
-export async function deleteInstallationByGitHubId(githubInstallationId: number) {
+export async function deleteInstallationByGitHubId(githubInstallationId: number, organizationId?: string) {
+  const conditions = [eq(github_installations.github_installation_id, githubInstallationId)];
+  if (organizationId) {
+    conditions.push(eq(github_installations.organization_id, organizationId));
+  }
   return db
     .delete(github_installations)
-    .where(eq(github_installations.github_installation_id, githubInstallationId));
+    .where(and(...conditions));
 }
 
 export async function updateRepositorySyncState(
   id: string,
   syncingAt: Date | null,
-  lastScannedAt?: Date | null
+  lastScannedAt?: Date | null,
+  organizationId?: string
 ) {
+  const conditions = [eq(repositories.id, id)];
+  if (organizationId) {
+    conditions.push(eq(repositories.organization_id, organizationId));
+  }
   const updateData: Record<string, unknown> = {
     syncing_at: syncingAt,
     updated_at: new Date(),
@@ -159,7 +172,7 @@ export async function updateRepositorySyncState(
   const [updated] = await db
     .update(repositories)
     .set(updateData)
-    .where(eq(repositories.id, id))
+    .where(and(...conditions))
     .returning();
   return updated ?? null;
 }

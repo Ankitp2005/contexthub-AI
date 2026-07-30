@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getInstallationAccessToken } from "./index";
 import type { GitHubPRFile } from "../types";
+import { fetchPaginatedArray } from "./pagination";
 
 const GITHUB_API_BASE = "https://api.github.com";
 const GITHUB_API_VERSION = "2022-11-28";
@@ -22,18 +23,10 @@ export async function listPullRequestFiles(
 ): Promise<GitHubPRFile[]> {
   const token = await getInstallationAccessToken(installationId);
 
-  const response = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`,
-    { headers: bearerHeaders(token) }
+  return fetchPaginatedArray<GitHubPRFile>(
+    `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls/${prNumber}/files`,
+    bearerHeaders(token),
   );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to list PR files: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json() as Promise<GitHubPRFile[]>;
 }
 
 export async function listRepositoryPullRequests(
@@ -43,16 +36,9 @@ export async function listRepositoryPullRequests(
   state: "open" | "closed" | "all" = "open"
 ): Promise<any[]> {
   const token = await getInstallationAccessToken(installationId);
-  const response = await fetch(
-    `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls?state=${state}&per_page=50`,
-    { headers: bearerHeaders(token) }
+
+  return fetchPaginatedArray(
+    `${GITHUB_API_BASE}/repos/${owner}/${repo}/pulls?state=${state}`,
+    bearerHeaders(token),
   );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to list PRs for repository ${owner}/${repo}: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json() as Promise<any[]>;
 }

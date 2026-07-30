@@ -7,6 +7,9 @@
 const GITHUB_API_BASE = "https://api.github.com";
 const GITHUB_API_VERSION = "2022-11-28";
 
+/** Maximum concurrent commit-detail fetches to avoid hammering rate limits. */
+const CONCURRENCY_LIMIT = 5;
+
 function githubHeaders(token: string): HeadersInit {
   return {
     Authorization: `token ${token}`,
@@ -44,8 +47,33 @@ interface GitHubCommitDetail {
 }
 
 /**
+ * Processes items in batches with concurrency control.
+ * Ensures at most `limit` promises are in-flight at once.
+ */
+async function withConcurrencyLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const batch = items.slice(i, i + limit);
+    const batchResults = await Promise.allSettled(batch.map(fn));
+    for (const r of batchResults) {
+      if (r.status === "fulfilled") {
+        results.push(r.value);
+      }
+    }
+  }
+  return results;
+}
+
+/**
  * Fetches the last `maxCommits` commits for a repository and returns a flat
  * list of per-file, per-author statistics.
+ *
+ * Batch-fetches commit details with concurrency control (CONCURRENCY_LIMIT)
+ * to balance speed against GitHub API rate limits.
  *
  * @param token  GitHub installation access token
  * @param owner  Repository owner (org or user)
@@ -58,7 +86,7 @@ export async function fetchRepositoryCommitStats(
   repo: string,
   maxCommits = 100
 ): Promise<CommitFileStat[]> {
-  // 1. List recent commits (paginated — GitHub max per_page is 100)
+  // 1. List recent commits
   const commitsUrl = `${GITHUB_API_BASE}/repos/${owner}/${repo}/commits?per_page=${Math.min(maxCommits, 100)}`;
   const commitsRes = await fetch(commitsUrl, { headers: githubHeaders(token) });
 
@@ -70,36 +98,29 @@ export async function fetchRepositoryCommitStats(
   }
 
   const commits = (await commitsRes.json()) as GitHubCommitSummary[];
-  const stats: CommitFileStat[] = [];
 
-  // 2. Fetch file-level detail for each commit (sequential to respect rate limits)
-  for (const commit of commits) {
+  // 2. Batch-fetch file-level detail per commit with concurrency control
+  const detailResults = await withConcurrencyLimit(commits, CONCURRENCY_LIMIT, async (commit) => {
     const authorLogin = commit.author?.login ?? commit.commit.author?.name ?? "unknown";
     const committedAt = commit.commit.author?.date ?? new Date().toISOString();
 
-    try {
-      const detailRes = await fetch(
-        `${GITHUB_API_BASE}/repos/${owner}/${repo}/commits/${commit.sha}`,
-        { headers: githubHeaders(token) }
-      );
+    const detailRes = await fetch(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/commits/${commit.sha}`,
+      { headers: githubHeaders(token) }
+    );
 
-      if (!detailRes.ok) continue;
+    if (!detailRes.ok) return [];
 
-      const detail = (await detailRes.json()) as GitHubCommitDetail;
+    const detail = (await detailRes.json()) as GitHubCommitDetail;
 
-      for (const file of detail.files ?? []) {
-        stats.push({
-          authorLogin,
-          filePath: file.filename,
-          additions: file.additions,
-          deletions: file.deletions,
-          committedAt,
-        });
-      }
-    } catch {
-      // Best-effort: skip commits that fail individually
-    }
-  }
+    return (detail.files ?? []).map((file) => ({
+      authorLogin,
+      filePath: file.filename,
+      additions: file.additions,
+      deletions: file.deletions,
+      committedAt,
+    }));
+  });
 
-  return stats;
+  return detailResults.flat();
 }

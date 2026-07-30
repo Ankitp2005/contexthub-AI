@@ -2,8 +2,7 @@ import type { GitHubPullRequestWebhookPayload } from "../types";
 import {
   findRepositoryByGitHubRepoId,
   upsertPullRequest,
-  clearPullRequestFiles,
-  storePullRequestFiles,
+  replacePullRequestFiles,
 } from "../repositories/pull-requests";
 import { listPullRequestFiles } from "./pull-requests";
 import { runRiskPipeline } from "@/domains/risk/services/pipeline";
@@ -59,9 +58,8 @@ export async function handlePullRequestEvent(
       pr.number
     );
 
-    // Persist files to DB
-    await clearPullRequestFiles(prRecord.id);
-    await storePullRequestFiles(prRecord.id, files);
+    // Atomically replace files in a transaction
+    await replacePullRequestFiles(prRecord.id, files);
 
     console.log(
       `[PR Ingestion] Stored ${files.length} files for PR #${pr.number}`

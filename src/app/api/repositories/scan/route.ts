@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         skippedRepos.push(repo.full_name);
       } else {
         // Set syncing lock state
-        await updateRepositorySyncState(repo.id, new Date());
+        await updateRepositorySyncState(repo.id, new Date(), undefined, userId);
         
         try {
           // Attempt to dispatch via Inngest background job

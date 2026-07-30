@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     // Delete any repositories that are no longer in the active list
     for (const existing of existingRepos) {
       if (!activeRepoIds.has(existing.github_repo_id)) {
-        await deleteRepositoryByGitHubId(existing.github_repo_id);
+        await deleteRepositoryByGitHubId(existing.github_repo_id, organization.id);
       }
     }
 
